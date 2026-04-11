@@ -4,10 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000"
-    android:orientation="vertical"
-    android:padding="0dp">
+    android:orientation="vertical">
 
-    <!-- ══ HEADER: LOGO + BRAND + VAULT BUTTON ══ -->
+    <!-- ══ HEADER ══ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -23,7 +22,7 @@
             android:layout_width="42dp"
             android:layout_height="42dp"
             android:src="@mipmap/ic_launcher"
-            android:contentDescription="Leo Logo"
+            android:contentDescription="Leo"
             android:scaleType="fitCenter" />
 
         <LinearLayout
@@ -46,14 +45,15 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="SHS LAB — System Agent v1.0"
+                android:text="SHS LAB — Limitless Android Surrogate"
                 android:textColor="#E91E8C"
                 android:textSize="10sp"
                 android:fontFamily="monospace"
-                android:letterSpacing="0.15" />
+                android:letterSpacing="0.1" />
+
         </LinearLayout>
 
-        <!-- VAULT settings button -->
+        <!-- Vault button -->
         <Button
             android:id="@+id/btnVault"
             android:layout_width="wrap_content"
@@ -63,11 +63,10 @@
             android:fontFamily="monospace"
             android:textColor="#000000"
             android:backgroundTint="#6B35A5"
-            android:letterSpacing="0.1"
             android:paddingHorizontal="10dp"
             android:layout_marginEnd="6dp" />
 
-        <!-- Overlay toggle button -->
+        <!-- Island button -->
         <Button
             android:id="@+id/btnIsland"
             android:layout_width="wrap_content"
@@ -77,7 +76,6 @@
             android:fontFamily="monospace"
             android:textColor="#000000"
             android:backgroundTint="#FFD600"
-            android:letterSpacing="0.15"
             android:paddingHorizontal="10dp" />
 
     </LinearLayout>
@@ -93,7 +91,6 @@
         android:paddingVertical="8dp"
         android:gravity="center_vertical">
 
-        <!-- Accessibility dot + label + button -->
         <View
             android:id="@+id/dotAccessibility"
             android:layout_width="10dp"
@@ -122,7 +119,6 @@
             android:paddingHorizontal="8dp"
             android:layout_marginEnd="12dp" />
 
-        <!-- Overlay dot + label + button -->
         <View
             android:id="@+id/dotOverlay"
             android:layout_width="10dp"
@@ -158,36 +154,23 @@
         android:layout_height="1px"
         android:background="#1A1A1A" />
 
-    <!-- ══ TERMINAL LOG ══ -->
-    <ScrollView
-        android:id="@+id/scrollTerminal"
+    <!-- ══ CHAT RECYCLER ══ -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvChat"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:background="#000000"
-        android:fillViewport="true"
-        android:overScrollMode="never">
-
-        <TextView
-            android:id="@+id/tvTerminal"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="12dp"
-            android:textColor="#00E5FF"
-            android:textSize="11sp"
-            android:fontFamily="monospace"
-            android:lineSpacingMultiplier="1.4"
-            android:text=""
-            android:textIsSelectable="true"
-            android:keepScreenOn="true" />
-
-    </ScrollView>
+        android:paddingVertical="8dp"
+        android:clipToPadding="false"
+        android:overScrollMode="never"
+        android:scrollbars="none" />
 
     <!-- ══ DIVIDER ══ -->
     <View
         android:layout_width="match_parent"
         android:layout_height="1px"
-        android:background="#1E1E1E" />
+        android:background="#1A1A1A" />
 
     <!-- ══ INPUT BAR ══ -->
     <LinearLayout
@@ -216,7 +199,7 @@
             android:background="@drawable/input_background"
             android:textColor="#00E5FF"
             android:textColorHint="#334455"
-            android:hint="enter command..."
+            android:hint="message Leo..."
             android:textSize="12sp"
             android:fontFamily="monospace"
             android:paddingHorizontal="10dp"
@@ -229,12 +212,11 @@
             android:id="@+id/btnSend"
             android:layout_width="wrap_content"
             android:layout_height="40dp"
-            android:text="RUN"
+            android:text="SEND"
             android:textSize="11sp"
             android:fontFamily="monospace"
             android:textColor="#000000"
             android:backgroundTint="#E91E8C"
-            android:letterSpacing="0.1"
             android:paddingHorizontal="14dp"
             android:layout_marginStart="8dp" />
 
