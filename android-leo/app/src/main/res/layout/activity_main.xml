@@ -1,8 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    LEO TERMINAL UI — SHS LAB
-    Pitch-black God-Mode Command Interface
--->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -11,7 +7,7 @@
     android:orientation="vertical"
     android:padding="0dp">
 
-    <!-- ══ HEADER: LOGO + BRAND ══ -->
+    <!-- ══ HEADER: LOGO + BRAND + VAULT BUTTON ══ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -24,8 +20,8 @@
 
         <ImageView
             android:id="@+id/imgLeoLogo"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
             android:src="@mipmap/ic_launcher"
             android:contentDescription="Leo Logo"
             android:scaleType="fitCenter" />
@@ -57,9 +53,23 @@
                 android:letterSpacing="0.15" />
         </LinearLayout>
 
+        <!-- VAULT settings button -->
+        <Button
+            android:id="@+id/btnVault"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="⚙ VAULT"
+            android:textSize="9sp"
+            android:fontFamily="monospace"
+            android:textColor="#000000"
+            android:backgroundTint="#6B35A5"
+            android:letterSpacing="0.1"
+            android:paddingHorizontal="10dp"
+            android:layout_marginEnd="6dp" />
+
         <!-- Overlay toggle button -->
         <Button
-            android:id="@+id/btnOverlay"
+            android:id="@+id/btnIsland"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
             android:text="ISLAND"
@@ -72,13 +82,83 @@
 
     </LinearLayout>
 
+    <!-- ══ PERMISSION STATUS BAR ══ -->
+    <LinearLayout
+        android:id="@+id/layoutPermissions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#0D0D0D"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp"
+        android:gravity="center_vertical">
+
+        <!-- Accessibility dot + label + button -->
+        <View
+            android:id="@+id/dotAccessibility"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/status_dot" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Accessibility"
+            android:textColor="#888888"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:paddingStart="8dp" />
+
+        <Button
+            android:id="@+id/btnEnableAccessibility"
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:text="ENABLE"
+            android:textSize="8sp"
+            android:fontFamily="monospace"
+            android:textColor="#000000"
+            android:backgroundTint="#FF4444"
+            android:paddingHorizontal="8dp"
+            android:layout_marginEnd="12dp" />
+
+        <!-- Overlay dot + label + button -->
+        <View
+            android:id="@+id/dotOverlay"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/status_dot" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Overlay"
+            android:textColor="#888888"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:paddingStart="8dp" />
+
+        <Button
+            android:id="@+id/btnEnableOverlay"
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:text="ENABLE"
+            android:textSize="8sp"
+            android:fontFamily="monospace"
+            android:textColor="#000000"
+            android:backgroundTint="#FF4444"
+            android:paddingHorizontal="8dp" />
+
+    </LinearLayout>
+
     <!-- ══ DIVIDER ══ -->
     <View
         android:layout_width="match_parent"
         android:layout_height="1px"
         android:background="#1A1A1A" />
 
-    <!-- ══ TERMINAL LOG: ScrollView + TextView ══ -->
+    <!-- ══ TERMINAL LOG ══ -->
     <ScrollView
         android:id="@+id/scrollTerminal"
         android:layout_width="match_parent"
@@ -86,8 +166,6 @@
         android:layout_weight="1"
         android:background="#000000"
         android:fillViewport="true"
-        android:fadeScrollbars="true"
-        android:scrollbarThumbVertical="@color/cyan"
         android:overScrollMode="never">
 
         <TextView
