@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    LEO DYNAMIC ISLAND OVERLAY — SHS LAB
+    Floating pulsating bubble with kill switch
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center">
+
+    <!-- Main pulsating bubble -->
+    <FrameLayout
+        android:id="@+id/overlayBubble"
+        android:layout_width="58dp"
+        android:layout_height="58dp"
+        android:background="@drawable/bubble_background"
+        android:elevation="16dp"
+        android:alpha="1.0">
+
+        <!-- Logo icon inside bubble -->
+        <ImageView
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_gravity="center"
+            android:src="@mipmap/ic_launcher"
+            android:scaleType="fitCenter"
+            android:contentDescription="Leo" />
+
+        <!-- Status dot (top-right): pulsating indicator -->
+        <View
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_gravity="top|end"
+            android:layout_margin="4dp"
+            android:background="@drawable/status_dot" />
+
+    </FrameLayout>
+
+    <!-- Kill Switch button below bubble -->
+    <TextView
+        android:id="@+id/btnKillSwitch"
+        android:layout_width="58dp"
+        android:layout_height="20dp"
+        android:layout_marginTop="4dp"
+        android:text="■ KILL"
+        android:textSize="8sp"
+        android:textColor="#FF1744"
+        android:fontFamily="monospace"
+        android:gravity="center"
+        android:background="@drawable/kill_switch_bg"
+        android:letterSpacing="0.1"
+        android:clickable="true"
+        android:focusable="true" />
+
+</LinearLayout>
