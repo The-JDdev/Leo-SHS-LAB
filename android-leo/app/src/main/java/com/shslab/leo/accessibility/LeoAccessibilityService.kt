@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
 import android.graphics.Path
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
@@ -143,6 +144,29 @@ class LeoAccessibilityService : AccessibilityService() {
             performGestureScroll(direction)
             root.recycle()
             true
+        }
+    }
+
+    /**
+     * Launch any installed app by its package name.
+     * Uses PackageManager — no shell, no SecurityException.
+     * @return true if launch intent was successfully fired
+     */
+    fun launchAppByPackage(packageName: String): Boolean {
+        return try {
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(launchIntent)
+                Logger.action("[UI] Launched app: $packageName")
+                true
+            } else {
+                Logger.warn("[UI] App not installed or no launch intent: $packageName")
+                false
+            }
+        } catch (e: Exception) {
+            Logger.error("[UI] launchAppByPackage failed: ${e.message}")
+            false
         }
     }
 
