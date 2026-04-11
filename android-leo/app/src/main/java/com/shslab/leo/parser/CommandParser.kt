@@ -5,27 +5,23 @@ import org.json.JSONObject
 
 /**
  * ══════════════════════════════════════════
- *  LEO COMMAND PARSER — SHS LAB
+ *  LEO COMMAND PARSER — SHS LAB v3
  *
  *  Strips markdown, extracts valid JSON.
  *  Validates against Leo command schema.
+ *  Supports sub_action and timeout_ms for WAIT_FOR.
  * ══════════════════════════════════════════
  */
 object CommandParser {
 
-    // Regex: extract JSON object even if wrapped in markdown code blocks
-    private val JSON_BLOCK_REGEX = Regex(
-        "```(?:json)?\\s*([\\s\\S]*?)```|\\{[\\s\\S]*\\}",
-        setOf(RegexOption.MULTILINE)
-    )
-
-    // Simple JSON object detection
     private val JSON_OBJECT_REGEX = Regex("\\{[\\s\\S]*\\}", RegexOption.DOT_MATCHES_ALL)
 
     data class LeoCommand(
         val action: String,
+        val subAction: String,
         val target: String,
         val value: String,
+        val timeoutMs: Long,
         val priority: Int = 1,
         val delayMs: Long = 0L,
         val raw: JSONObject
@@ -39,8 +35,6 @@ object CommandParser {
         Logger.net("[Leo]: Parsing AI Payload...")
 
         val trimmed = aiResponse.trim()
-
-        // Extract JSON from possible markdown wrapper
         val jsonString = extractJson(trimmed) ?: run {
             Logger.error("Parser: no valid JSON found in response")
             Logger.raw("Raw response: ${trimmed.take(200)}")
@@ -48,23 +42,24 @@ object CommandParser {
         }
 
         return try {
-            val obj    = JSONObject(jsonString)
-            val action = obj.optString("action", "").uppercase()
-            val target = obj.optString("target", "")
-            val value  = obj.optString("value", "")
+            val obj       = JSONObject(jsonString)
+            val action    = obj.optString("action", "").uppercase()
+            val subAction = obj.optString("sub_action", "").uppercase()
+            val target    = obj.optString("target", "")
+            val value     = obj.optString("value", "")
+            val timeoutMs = obj.optLong("timeout_ms", 10000L)
 
             if (action.isEmpty()) {
                 Logger.error("Parser: missing 'action' field")
                 return null
             }
 
-            // Extract optional meta
-            val meta     = obj.optJSONObject("meta")
-            val priority = meta?.optInt("priority", 1) ?: 1
-            val delayMs  = meta?.optLong("delay_ms", 0L) ?: 0L
+            val meta      = obj.optJSONObject("meta")
+            val priority  = meta?.optInt("priority", 1) ?: 1
+            val delayMs   = meta?.optLong("delay_ms", 0L) ?: 0L
 
-            val cmd = LeoCommand(action, target, value, priority, delayMs, obj)
-            Logger.action("[Leo]: Dispatching Action → $action | target='$target'")
+            val cmd = LeoCommand(action, subAction, target, value, timeoutMs, priority, delayMs, obj)
+            Logger.action("[Leo]: Dispatching → $action${if (subAction.isNotEmpty()) ":$subAction" else ""} | target='$target'")
             cmd
         } catch (e: Exception) {
             Logger.error("Parser JSON exception: ${e.message}")
@@ -73,48 +68,44 @@ object CommandParser {
     }
 
     private fun extractJson(input: String): String? {
-        // Case 1: Clean JSON object directly
-        if (input.startsWith("{")) {
-            return cleanJsonString(input)
-        }
+        if (input.startsWith("{")) return cleanJsonString(input)
 
-        // Case 2: Markdown code block ```json ... ```
         val blockMatch = Regex("```(?:json)?\\s*([\\s\\S]*?)```").find(input)
         if (blockMatch != null) {
             val inner = blockMatch.groupValues[1].trim()
             if (inner.startsWith("{")) return cleanJsonString(inner)
         }
 
-        // Case 3: JSON object embedded in prose
         val objectMatch = JSON_OBJECT_REGEX.find(input)
-        if (objectMatch != null) {
-            return cleanJsonString(objectMatch.value)
-        }
+        if (objectMatch != null) return cleanJsonString(objectMatch.value)
 
         return null
     }
 
-    /**
-     * Remove common AI response artifacts from JSON strings
-     */
     private fun cleanJsonString(raw: String): String {
         return raw
             .trimIndent()
             .trim()
-            .replace("\u200B", "")   // Zero-width space
-            .replace("\uFEFF", "")   // BOM
+            .replace("\u200B", "")
+            .replace("\uFEFF", "")
+    }
+
+    /**
+     * True if this response is a LOG action (final conversational reply).
+     */
+    fun isLogAction(aiResponse: String): Boolean {
+        val json = extractJson(aiResponse.trim()) ?: return false
+        return try {
+            JSONObject(json).optString("action", "").uppercase() == "LOG"
+        } catch (_: Exception) { false }
     }
 
     /**
      * Extract the human-readable display text from an AI response.
-     *
-     * Priority:
-     * 1. action=LOG → return its "value" (Leo's spoken reply)
-     * 2. Any other valid JSON action → return a one-liner summary
-     * 3. Not JSON / parse failure → return raw response trimmed
+     * Returns LOG value if action=LOG, otherwise a short action summary.
      */
     fun extractDisplayText(aiResponse: String): String {
-        val trimmed = aiResponse.trim()
+        val trimmed   = aiResponse.trim()
         val jsonString = extractJson(trimmed) ?: return trimmed.take(500)
         return try {
             val obj    = JSONObject(jsonString)
@@ -123,7 +114,7 @@ object CommandParser {
             val target = obj.optString("target", "")
             when {
                 action == "LOG"  -> value.ifBlank { "(no message)" }
-                action.isNotEmpty() && value.isNotEmpty() -> "⚡ $action → $target"
+                action.isNotEmpty() && target.isNotEmpty() -> "⚡ $action → $target"
                 action.isNotEmpty() -> "⚡ $action executed"
                 else -> trimmed.take(500)
             }
@@ -133,8 +124,7 @@ object CommandParser {
     }
 
     /**
-     * Build a structured feedback JSON for the next AI call.
-     * Closes the internal feedback loop (Phase 2).
+     * Build a structured feedback JSON for the mission reporting loop.
      */
     fun buildFeedback(status: String, action: String, message: String): String {
         return JSONObject().apply {
