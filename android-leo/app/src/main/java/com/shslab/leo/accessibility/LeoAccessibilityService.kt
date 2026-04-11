@@ -13,17 +13,17 @@ import com.shslab.leo.core.Logger
 
 /**
  * ══════════════════════════════════════════
- *  LEO ACCESSIBILITY SERVICE — SHS LAB
- *  God-Mode UI Control Layer
+ *  LEO ACCESSIBILITY SERVICE — SHS LAB v3
+ *  Level 5 God-Mode UI Control Layer
  *
- *  Enables Leo to browse, click, type, and
- *  scroll ANY app on the device autonomously.
+ *  New in v3:
+ *  • waitForNode()  — dynamic UI polling, adapts to any app speed
+ *  • readScreenText() — full screen dump for AI context awareness
  * ══════════════════════════════════════════
  */
 class LeoAccessibilityService : AccessibilityService() {
 
     companion object {
-        /** Singleton reference — set on connection */
         @Volatile
         var instance: LeoAccessibilityService? = null
             private set
@@ -32,20 +32,14 @@ class LeoAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        Logger.system("Accessibility service: CONNECTED — God Mode active")
+        Logger.system("Accessibility service: CONNECTED — Level 5 God Mode active")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        // Phase 1 skeleton: capture events, dispatch to controller in Phase 2+
         when (event.eventType) {
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                // Window changed — update context for next command cycle
-            }
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
-                // Content changed — node tree updated
-            }
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> { }
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> { }
         }
-        // Full traversal logic implemented in AccessibilityController
     }
 
     override fun onInterrupt() {
@@ -60,13 +54,99 @@ class LeoAccessibilityService : AccessibilityService() {
     }
 
     // ════════════════════════════════════════════
-    //  NODE TRAVERSAL & INTERACTION METHODS
+    //  LEVEL 5: EYES — SCREEN CONTEXT READER
     // ════════════════════════════════════════════
 
     /**
-     * Find a node by text content or view ID and perform a CLICK action.
-     * @return true if node was found and clicked
+     * Dump ALL visible text and content-descriptions from the current screen.
+     * Returns a structured multi-line string so AI can see what's on screen.
+     * This is Leo's vision system — makes him context-aware in ANY app.
+     *
+     * @return Formatted screen dump, or error string if window not available
      */
+    fun readScreenText(): String {
+        val root = rootInActiveWindow ?: run {
+            Logger.warn("[EYES] No active window — screen read failed")
+            return "screen_read_failed:no_active_window"
+        }
+
+        val sb = StringBuilder()
+        sb.appendLine("=== SCREEN CONTEXT DUMP ===")
+        collectNodeText(root, sb, depth = 0)
+        root.recycle()
+
+        val result = sb.toString().trim()
+        val lineCount = result.lines().size
+        Logger.action("[EYES] Screen dump: $lineCount elements captured")
+
+        return if (result.length > 50) result.take(4000) else "screen_empty:no_visible_text"
+    }
+
+    /**
+     * Recursively traverse the node tree and collect all text.
+     */
+    private fun collectNodeText(node: AccessibilityNodeInfo, sb: StringBuilder, depth: Int) {
+        val text = node.text?.toString()?.trim()
+        val desc = node.contentDescription?.toString()?.trim()
+        val hint = node.hintText?.toString()?.trim()
+        val id   = node.viewIdResourceName?.substringAfterLast("/")?.trim()
+
+        when {
+            !text.isNullOrBlank()  -> sb.appendLine("[TEXT${if (id != null) " id=$id" else ""}] $text")
+            !desc.isNullOrBlank()  -> sb.appendLine("[DESC${if (id != null) " id=$id" else ""}] $desc")
+            !hint.isNullOrBlank()  -> sb.appendLine("[HINT] $hint")
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            collectNodeText(child, sb, depth + 1)
+            child.recycle()
+        }
+    }
+
+    // ════════════════════════════════════════════
+    //  LEVEL 5: PATIENCE — DYNAMIC WAIT_FOR
+    // ════════════════════════════════════════════
+
+    /**
+     * Poll the accessibility node tree every 500ms until the target element appears.
+     * Adapts to any app's load time — if network is slow, waits longer; if fast, returns immediately.
+     *
+     * @param target  Text content OR view ID to search for
+     * @param timeoutMs  Maximum wait in milliseconds (default 10000)
+     * @return "found:<target>:<elapsed_ms>ms" or "timeout:<target>"
+     */
+    fun waitForNode(target: String, timeoutMs: Long = 10000L): String {
+        val startTime    = System.currentTimeMillis()
+        val pollInterval = 500L
+
+        Logger.action("[WAIT] Watching for '$target' (timeout: ${timeoutMs}ms, poll: ${pollInterval}ms)")
+
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            val root = rootInActiveWindow
+            if (root != null) {
+                val node = findNode(root, textContent = target, viewId = target)
+                if (node != null) {
+                    val elapsed = System.currentTimeMillis() - startTime
+                    node.recycle()
+                    root.recycle()
+                    Logger.action("[WAIT] ✓ Found '$target' after ${elapsed}ms")
+                    return "found:${target}:${elapsed}ms"
+                }
+                root.recycle()
+            }
+            Thread.sleep(pollInterval)
+        }
+
+        val elapsed = System.currentTimeMillis() - startTime
+        Logger.warn("[WAIT] ✗ Timeout — '$target' not found after ${elapsed}ms")
+        return "timeout:${target}:waited_${elapsed}ms"
+    }
+
+    // ════════════════════════════════════════════
+    //  NODE TRAVERSAL & INTERACTION METHODS
+    // ════════════════════════════════════════════
+
     fun findNodeAndClick(textContent: String? = null, viewId: String? = null): Boolean {
         val root = rootInActiveWindow ?: run {
             Logger.warn("Accessibility: no active window root")
@@ -86,21 +166,15 @@ class LeoAccessibilityService : AccessibilityService() {
         }
     }
 
-    /**
-     * Inject text into a focused input node.
-     * Primary: ACTION_SET_TEXT | Fallback: ClipboardManager paste
-     */
     fun injectTextToNode(viewId: String? = null, textContent: String? = null, textToType: String): Boolean {
         val root = rootInActiveWindow ?: return false
         val node = findNode(root, textContent, viewId)
         return if (node != null) {
-            // Try ACTION_SET_TEXT first (API 21+)
             val args = Bundle().apply {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, textToType)
             }
             var result = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
 
-            // Clipboard fallback
             if (!result) {
                 node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
                 val clipboard = getSystemService(ClipboardManager::class.java)
@@ -108,21 +182,17 @@ class LeoAccessibilityService : AccessibilityService() {
                 result = node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
             }
 
-            Logger.action("[ACT] UI_TYPE → '$textToType' into id='$viewId' result=$result")
+            Logger.action("[ACT] UI_TYPE → '${textToType.take(40)}' into id='$viewId' result=$result")
             node.recycle()
             root.recycle()
             result
         } else {
-            Logger.warn("Text injection target not found: id='$viewId'")
+            Logger.warn("Text injection target not found: id='$viewId' text='$textContent'")
             root.recycle()
             false
         }
     }
 
-    /**
-     * Perform a scroll action in a given direction.
-     * @param direction "up" | "down" | "left" | "right"
-     */
     fun performScroll(direction: String): Boolean {
         val root = rootInActiveWindow ?: return false
         val scrollable = findScrollableNode(root)
@@ -140,18 +210,12 @@ class LeoAccessibilityService : AccessibilityService() {
             root.recycle()
             result
         } else {
-            // Fallback: gesture-based swipe
             performGestureScroll(direction)
             root.recycle()
             true
         }
     }
 
-    /**
-     * Launch any installed app by its package name.
-     * Uses PackageManager — no shell, no SecurityException.
-     * @return true if launch intent was successfully fired
-     */
     fun launchAppByPackage(packageName: String): Boolean {
         return try {
             val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
@@ -170,29 +234,20 @@ class LeoAccessibilityService : AccessibilityService() {
         }
     }
 
-    /**
-     * Press the device BACK button
-     */
     fun pressBack() = performGlobalAction(GLOBAL_ACTION_BACK)
-
-    /**
-     * Press the HOME button
-     */
     fun pressHome() = performGlobalAction(GLOBAL_ACTION_HOME)
 
     // ── Internal Helpers ──
 
-    private fun findNode(
+    internal fun findNode(
         root: AccessibilityNodeInfo,
         textContent: String?,
         viewId: String?
     ): AccessibilityNodeInfo? {
-        // Try viewId first (more precise)
         if (!viewId.isNullOrEmpty()) {
             val byId = root.findAccessibilityNodeInfosByViewId(viewId)
             if (byId.isNotEmpty()) return byId[0]
         }
-        // Try text content
         if (!textContent.isNullOrEmpty()) {
             val byText = root.findAccessibilityNodeInfosByText(textContent)
             if (byText.isNotEmpty()) return byText[0]
