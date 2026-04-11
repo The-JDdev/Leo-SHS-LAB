@@ -10,15 +10,17 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
-import android.widget.ScrollView
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.shslab.leo.accessibility.LeoAccessibilityService
+import com.shslab.leo.chat.ChatAdapter
 import com.shslab.leo.core.Logger
 import com.shslab.leo.executor.ActionExecutor
 import com.shslab.leo.network.LeoNetworkClient
 import com.shslab.leo.overlay.OverlayService
+import com.shslab.leo.parser.CommandParser
 import com.shslab.leo.security.SecurityManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -26,118 +28,205 @@ import kotlinx.coroutines.withContext
 
 /**
  * ══════════════════════════════════════════
- *  LEO MAIN TERMINAL — SHS LAB
- *  Pitch-black God-Mode Command Interface
+ *  LEO MAIN ACTIVITY — SHS LAB
+ *  Modern Chat Interface with Thinking Accordion
  * ══════════════════════════════════════════
  */
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var terminalTextView: TextView
-    private lateinit var terminalScrollView: ScrollView
-    private lateinit var inputEditText: EditText
-    private lateinit var sendButton: Button
-    private lateinit var btnIsland: Button
+    // ── Views ──
+    private lateinit var rvChat: RecyclerView
+    private lateinit var etInput: EditText
+    private lateinit var btnSend: Button
     private lateinit var btnVault: Button
+    private lateinit var btnIsland: Button
     private lateinit var btnEnableAccessibility: Button
     private lateinit var btnEnableOverlay: Button
     private lateinit var dotAccessibility: View
     private lateinit var dotOverlay: View
-    private lateinit var logoImageView: ImageView
+    private lateinit var imgLeoLogo: ImageView
 
+    // ── Chat engine ──
+    private lateinit var chatAdapter: ChatAdapter
+
+    // ── Backend ──
     private val networkClient by lazy { LeoNetworkClient() }
     private val actionExecutor by lazy { ActionExecutor(this) }
 
+    // Track current pending Leo message ID for log routing
+    @Volatile private var pendingLeoId: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Encrypted vault must be unlocked before anything else
         SecurityManager.init(this)
-
         setContentView(R.layout.activity_main)
-
         bindViews()
-        Logger.attach(terminalTextView, terminalScrollView)
-        bootSequence()
+        setupChat()
+        wireInputs()
+        bootGreeting()
     }
 
-    private fun bindViews() {
-        logoImageView          = findViewById(R.id.imgLeoLogo)
-        terminalScrollView     = findViewById(R.id.scrollTerminal)
-        terminalTextView       = findViewById(R.id.tvTerminal)
-        inputEditText          = findViewById(R.id.etInput)
-        sendButton             = findViewById(R.id.btnSend)
-        btnIsland              = findViewById(R.id.btnIsland)
-        btnVault               = findViewById(R.id.btnVault)
-        btnEnableAccessibility = findViewById(R.id.btnEnableAccessibility)
-        btnEnableOverlay       = findViewById(R.id.btnEnableOverlay)
-        dotAccessibility       = findViewById(R.id.dotAccessibility)
-        dotOverlay             = findViewById(R.id.dotOverlay)
-
-        sendButton.setOnClickListener { dispatchUserCommand() }
-        btnIsland.setOnClickListener  { toggleOverlay() }
-        btnVault.setOnClickListener   { openVault() }
-
-        // Tapping ENABLE fires the real Android system settings intent
-        btnEnableAccessibility.setOnClickListener {
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(intent)
-            Logger.system("[SETUP] Redirecting to Accessibility Settings...")
-        }
-
-        btnEnableOverlay.setOnClickListener {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
-            )
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(intent)
-            Logger.system("[SETUP] Redirecting to Overlay Permission Settings...")
-        }
-
-        // IME send action on keyboard
-        inputEditText.setOnEditorActionListener { _, _, _ ->
-            dispatchUserCommand()
-            true
-        }
-    }
-
-    private fun bootSequence() {
-        Logger.system("════════════════════════════════")
-        Logger.system("  LEO v1.0.0 — SHS LAB ONLINE  ")
-        Logger.system("════════════════════════════════")
-        Logger.system("Kernel boot sequence initiated...")
-        Logger.leo("Identity protocol loaded.")
-        Logger.system("Encrypted vault: UNLOCKED")
-        Logger.system("Active provider: ${SecurityManager.getActiveProvider().uppercase()}")
-
-        // Check if API key is actually configured
-        val apiKey = SecurityManager.getActiveApiKey()
-        if (apiKey.isBlank()) {
-            Logger.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            Logger.warn("  NO API KEY CONFIGURED")
-            Logger.warn("  Tap ⚙ VAULT to enter your key.")
-            Logger.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        } else {
-            Logger.system("API key: LOADED (${apiKey.length} chars)")
-            Logger.system("Ready for operator input.")
-        }
-
-        Logger.raw("────────────────────────────────")
-    }
-
-    /**
-     * Called every time the user returns to this screen.
-     * Refreshes permission status dots live.
-     */
     override fun onResume() {
         super.onResume()
         refreshPermissionStatus()
     }
 
-    /**
-     * Check both permissions and update the green/red status dots + button states.
-     */
+    override fun onDestroy() {
+        super.onDestroy()
+        Logger.clearCallbacks()
+    }
+
+    // ══════════════════════════════════════════════════
+    //  SETUP
+    // ══════════════════════════════════════════════════
+
+    private fun bindViews() {
+        rvChat                 = findViewById(R.id.rvChat)
+        etInput                = findViewById(R.id.etInput)
+        btnSend                = findViewById(R.id.btnSend)
+        btnVault               = findViewById(R.id.btnVault)
+        btnIsland              = findViewById(R.id.btnIsland)
+        btnEnableAccessibility = findViewById(R.id.btnEnableAccessibility)
+        btnEnableOverlay       = findViewById(R.id.btnEnableOverlay)
+        dotAccessibility       = findViewById(R.id.dotAccessibility)
+        dotOverlay             = findViewById(R.id.dotOverlay)
+        imgLeoLogo             = findViewById(R.id.imgLeoLogo)
+    }
+
+    private fun setupChat() {
+        chatAdapter = ChatAdapter()
+        rvChat.apply {
+            adapter = chatAdapter
+            layoutManager = LinearLayoutManager(this@MainActivity).also {
+                it.stackFromEnd = true
+            }
+            itemAnimator = null  // Prevent flicker on fast updates
+        }
+
+        // Route ALL Logger events into the active pending Leo thinking block
+        Logger.logCallback = { logLine ->
+            pendingLeoId?.let { id ->
+                chatAdapter.appendThinkingLog(id, logLine)
+            }
+        }
+    }
+
+    private fun wireInputs() {
+        btnSend.setOnClickListener { dispatchUserCommand() }
+
+        etInput.setOnEditorActionListener { _, _, _ ->
+            dispatchUserCommand()
+            true
+        }
+
+        btnVault.setOnClickListener {
+            startActivity(Intent(this, VaultActivity::class.java))
+        }
+
+        btnIsland.setOnClickListener { toggleOverlay() }
+
+        btnEnableAccessibility.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            })
+        }
+
+        btnEnableOverlay.setOnClickListener {
+            startActivity(Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK })
+        }
+    }
+
+    private fun bootGreeting() {
+        val provider = SecurityManager.getActiveProvider()
+        val hasKey   = SecurityManager.getActiveApiKey().isNotBlank()
+
+        if (hasKey) {
+            val id = chatAdapter.beginLeoResponse()
+            chatAdapter.appendThinkingLog(id, "Boot — SHS LAB Leo v2.0 UNLIMITED")
+            chatAdapter.appendThinkingLog(id, "Vault: UNLOCKED")
+            chatAdapter.appendThinkingLog(id, "Provider: ${provider.uppercase()} — KEY LOADED")
+            chatAdapter.appendThinkingLog(id, "Accessibility: ${if (isAccessibilityServiceEnabled()) "CONNECTED" else "PENDING"}")
+            chatAdapter.appendThinkingLog(id, "Ready for operator input.")
+            chatAdapter.finalizeLeoMessage(id, "Leo online. Ready for your orders, JD.")
+        } else {
+            val id = chatAdapter.beginLeoResponse()
+            chatAdapter.appendThinkingLog(id, "Boot — SHS LAB Leo v2.0 UNLIMITED")
+            chatAdapter.appendThinkingLog(id, "Vault: UNLOCKED — NO API KEY")
+            chatAdapter.finalizeLeoMessage(id, "No API key configured. Tap ⚙ VAULT to set one, then I'm fully operational.")
+        }
+    }
+
+    // ══════════════════════════════════════════════════
+    //  CORE COMMAND DISPATCH
+    // ══════════════════════════════════════════════════
+
+    private fun dispatchUserCommand() {
+        val text = etInput.text.toString().trim()
+        if (text.isEmpty()) return
+
+        // Guard: need API key
+        if (SecurityManager.getActiveApiKey().isBlank()) {
+            chatAdapter.addUserMessage(text)
+            val leoId = chatAdapter.beginLeoResponse()
+            chatAdapter.finalizeLeoMessage(leoId, "No API key. Tap ⚙ VAULT and enter your key first.")
+            etInput.setText("")
+            return
+        }
+
+        etInput.setText("")
+        btnSend.isEnabled = false
+
+        // 1. Add user bubble
+        chatAdapter.addUserMessage(text)
+
+        // 2. Create Leo's pending thinking bubble
+        val leoId = chatAdapter.beginLeoResponse()
+        pendingLeoId = leoId
+
+        // 3. All Logger calls now go into that bubble's thinking accordion
+        Logger.logCallback = { logLine ->
+            chatAdapter.appendThinkingLog(leoId, logLine)
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // Network call — logs go to thinking block automatically
+                val rawResponse = networkClient.sendPrompt(text)
+
+                // Parse to extract the "display" value (LOG action value)
+                val displayText = CommandParser.extractDisplayText(rawResponse)
+
+                withContext(Dispatchers.Main) {
+                    // Execute any actions SILENTLY in background
+                    actionExecutor.execute(rawResponse)
+
+                    // Finalize the chat bubble with the display text
+                    chatAdapter.finalizeLeoMessage(leoId, displayText)
+                    pendingLeoId = null
+                    btnSend.isEnabled = true
+
+                    // Reset callback — new messages will buffer until next dispatch
+                    Logger.logCallback = null
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    chatAdapter.appendThinkingLog(leoId, "[ERR] ${e.message}")
+                    chatAdapter.finalizeLeoMessage(leoId, "Uplink failure: ${e.message?.take(120)}")
+                    pendingLeoId = null
+                    btnSend.isEnabled = true
+                    Logger.logCallback = null
+                }
+            }
+        }
+    }
+
+    // ══════════════════════════════════════════════════
+    //  PERMISSION STATUS BAR
+    // ══════════════════════════════════════════════════
+
     private fun refreshPermissionStatus() {
         val hasAccessibility = isAccessibilityServiceEnabled()
         val hasOverlay       = Settings.canDrawOverlays(this)
@@ -145,34 +234,23 @@ class MainActivity : AppCompatActivity() {
         val green = 0xFF00C853.toInt()
         val red   = 0xFFFF4444.toInt()
 
-        // Set oval dot color while keeping the shape (GradientDrawable keeps it round)
-        fun setDotColor(dot: View, color: Int) {
-            val drawable = GradientDrawable()
-            drawable.shape = GradientDrawable.OVAL
-            drawable.setColor(color)
-            dot.background = drawable
+        fun setDot(dot: View, color: Int) {
+            val d = GradientDrawable().also { it.shape = GradientDrawable.OVAL; it.setColor(color) }
+            dot.background = d
         }
 
-        setDotColor(dotAccessibility, if (hasAccessibility) green else red)
+        setDot(dotAccessibility, if (hasAccessibility) green else red)
         btnEnableAccessibility.text = if (hasAccessibility) "✓ ON" else "ENABLE"
-        btnEnableAccessibility.backgroundTintList = ColorStateList.valueOf(
-            if (hasAccessibility) green else red
-        )
+        btnEnableAccessibility.backgroundTintList = ColorStateList.valueOf(if (hasAccessibility) green else red)
         btnEnableAccessibility.isEnabled = !hasAccessibility
 
-        setDotColor(dotOverlay, if (hasOverlay) green else red)
+        setDot(dotOverlay, if (hasOverlay) green else red)
         btnEnableOverlay.text = if (hasOverlay) "✓ ON" else "ENABLE"
-        btnEnableOverlay.backgroundTintList = ColorStateList.valueOf(
-            if (hasOverlay) green else red
-        )
+        btnEnableOverlay.backgroundTintList = ColorStateList.valueOf(if (hasOverlay) green else red)
         btnEnableOverlay.isEnabled = !hasOverlay
     }
 
-    /**
-     * Check if our LeoAccessibilityService is actually running.
-     */
     private fun isAccessibilityServiceEnabled(): Boolean {
-        val accessibilityManager = getSystemService(ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager
         val enabledServices = Settings.Secure.getString(
             contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
@@ -181,71 +259,18 @@ class MainActivity : AppCompatActivity() {
         return enabledServices.contains(componentName, ignoreCase = true)
     }
 
-    /**
-     * Open the Vault settings Activity so the operator can configure API keys.
-     */
-    private fun openVault() {
-        startActivity(Intent(this, VaultActivity::class.java))
-    }
+    // ══════════════════════════════════════════════════
+    //  OVERLAY
+    // ══════════════════════════════════════════════════
 
-    /**
-     * Core command dispatcher.
-     * Reads input → sends to AI via LeoNetworkClient → pipes response to ActionExecutor.
-     */
-    private fun dispatchUserCommand() {
-        val userInput = inputEditText.text.toString().trim()
-        if (userInput.isEmpty()) return
-
-        // Guard: must have API key before dispatching
-        val apiKey = SecurityManager.getActiveApiKey()
-        if (apiKey.isBlank()) {
-            Logger.error("No API key configured. Tap ⚙ VAULT to set one.")
-            Logger.warn("Press VAULT → enter your API key → SAVE.")
-            return
-        }
-
-        inputEditText.setText("")
-        sendButton.isEnabled = false
-
-        Logger.leo("Operator → $userInput")
-        Logger.net("[Leo]: Establishing direct uplink...")
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val response = networkClient.sendPrompt(userInput)
-                withContext(Dispatchers.Main) {
-                    actionExecutor.execute(response)
-                    sendButton.isEnabled = true
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Logger.error("Uplink failure: ${e.message}")
-                    sendButton.isEnabled = true
-                }
-            }
-        }
-    }
-
-    /**
-     * Start/stop the Dynamic Island overlay bubble.
-     */
     private fun toggleOverlay() {
         if (!Settings.canDrawOverlays(this)) {
-            Logger.warn("[OVERLAY] SYSTEM_ALERT_WINDOW not granted — tap ENABLE in the bar above.")
-            val intent = Intent(
+            startActivity(Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:$packageName")
-            )
-            startActivity(intent)
+            ))
             return
         }
-        val svc = Intent(this, OverlayService::class.java)
-        startForegroundService(svc)
-        Logger.system("[OVERLAY] Dynamic Island activated.")
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        Logger.detach()
+        startForegroundService(Intent(this, OverlayService::class.java))
     }
 }
