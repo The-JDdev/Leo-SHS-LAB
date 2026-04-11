@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="0dp">
+
+        <!-- ══ VAULT HEADER ══ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#0A0A0A"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="16dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="⚙  VAULT"
+                android:textColor="#6B35A5"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.3" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SHS LAB — Encrypted Config"
+                android:textColor="#444444"
+                android:textSize="10sp"
+                android:fontFamily="monospace" />
+
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1px"
+            android:background="#1A1A1A" />
+
+        <!-- ══ PROVIDER SELECTOR ══ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="AI PROVIDER"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.2"
+                android:paddingBottom="8dp" />
+
+            <!-- Provider radio row -->
+            <RadioGroup
+                android:id="@+id/rgProvider"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/rbOpenRouter"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="OpenRouter"
+                    android:textColor="#00E5FF"
+                    android:textSize="10sp"
+                    android:fontFamily="monospace"
+                    android:buttonTint="#00E5FF" />
+
+                <RadioButton
+                    android:id="@+id/rbOpenAI"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="OpenAI"
+                    android:textColor="#00E5FF"
+                    android:textSize="10sp"
+                    android:fontFamily="monospace"
+                    android:buttonTint="#00E5FF" />
+
+                <RadioButton
+                    android:id="@+id/rbClaude"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Claude"
+                    android:textColor="#00E5FF"
+                    android:textSize="10sp"
+                    android:fontFamily="monospace"
+                    android:buttonTint="#00E5FF" />
+
+                <RadioButton
+                    android:id="@+id/rbGemini"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Gemini"
+                    android:textColor="#00E5FF"
+                    android:textSize="10sp"
+                    android:fontFamily="monospace"
+                    android:buttonTint="#00E5FF" />
+
+            </RadioGroup>
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1px" android:background="#111111" android:layout_marginHorizontal="16dp" />
+
+        <!-- ══ API KEY ══ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="API KEY"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.2"
+                android:paddingBottom="6dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/etApiKey"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/input_background"
+                    android:textColor="#00E5FF"
+                    android:textColorHint="#334455"
+                    android:hint="sk-... or bearer token"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:paddingHorizontal="10dp"
+                    android:inputType="textPassword"
+                    android:maxLines="1"
+                    android:singleLine="true" />
+
+                <Button
+                    android:id="@+id/btnToggleApiKeyVisibility"
+                    android:layout_width="40dp"
+                    android:layout_height="44dp"
+                    android:text="👁"
+                    android:textSize="14sp"
+                    android:backgroundTint="#111111"
+                    android:layout_marginStart="6dp"
+                    android:padding="0dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- ══ MODEL ID ══ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MODEL ID"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.2"
+                android:paddingBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etModelId"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/input_background"
+                android:textColor="#00E5FF"
+                android:textColorHint="#334455"
+                android:hint="e.g. mistralai/mistral-7b-instruct"
+                android:textSize="12sp"
+                android:fontFamily="monospace"
+                android:paddingHorizontal="10dp"
+                android:inputType="text"
+                android:maxLines="1"
+                android:singleLine="true" />
+
+        </LinearLayout>
+
+        <!-- ══ BASE URL ══ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="BASE URL"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.2"
+                android:paddingBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etBaseUrl"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/input_background"
+                android:textColor="#00E5FF"
+                android:textColorHint="#334455"
+                android:hint="https://openrouter.ai/api/v1/chat/completions"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:paddingHorizontal="10dp"
+                android:inputType="textUri"
+                android:maxLines="1"
+                android:singleLine="true" />
+
+        </LinearLayout>
+
+        <!-- ══ GITHUB TOKEN ══ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="GITHUB TOKEN  (optional)"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.2"
+                android:paddingBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etGithubToken"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/input_background"
+                android:textColor="#00E5FF"
+                android:textColorHint="#334455"
+                android:hint="ghp_..."
+                android:textSize="12sp"
+                android:fontFamily="monospace"
+                android:paddingHorizontal="10dp"
+                android:inputType="textPassword"
+                android:maxLines="1"
+                android:singleLine="true" />
+
+        </LinearLayout>
+
+        <!-- ══ STATUS LABEL ══ -->
+        <TextView
+            android:id="@+id/tvVaultStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#444444"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:paddingTop="12dp"
+            android:paddingHorizontal="16dp" />
+
+        <!-- ══ SAVE BUTTON ══ -->
+        <Button
+            android:id="@+id/btnSaveVault"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            android:text="SAVE TO VAULT"
+            android:textSize="13sp"
+            android:fontFamily="monospace"
+            android:textColor="#000000"
+            android:backgroundTint="#6B35A5"
+            android:letterSpacing="0.2"
+            android:textStyle="bold" />
+
+        <!-- ══ NUKE BUTTON ══ -->
+        <Button
+            android:id="@+id/btnNukeVault"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginBottom="32dp"
+            android:text="WIPE VAULT"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:textColor="#FF4444"
+            android:backgroundTint="#0A0A0A"
+            android:letterSpacing="0.2" />
+
+    </LinearLayout>
+
+</ScrollView>
