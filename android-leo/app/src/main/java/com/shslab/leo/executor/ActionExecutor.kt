@@ -9,127 +9,206 @@ import com.shslab.leo.git.GitManager
 import com.shslab.leo.hardware.HardwareManager
 import com.shslab.leo.parser.CommandParser
 import com.shslab.leo.shell.ShellBridge
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 /**
  * ══════════════════════════════════════════
- *  LEO ACTION EXECUTOR — CENTRAL ROUTER
- *  SHS LAB v2 — UNLIMITED EDITION
+ *  LEO ACTION EXECUTOR — LEVEL 5 EDITION
+ *  SHS LAB v3 — AUTONOMOUS MISSION ENGINE
  *
- *  Routes parsed commands to the correct engine.
- *  All execution is SILENT — logs go to the Thinking
- *  accordion, not the chat. Chat only sees LOG results.
+ *  Core changes vs v2:
+ *  • executeAndReport() — suspendable, returns MissionResult
+ *  • Mission log — every action logs a human-readable step
+ *  • WAIT_FOR dispatch — dynamic UI polling via AccessibilityService
+ *  • READ_SCREEN dispatch — full screen dump for AI context
+ *  • Mission report compiled after each step, fed back to AI
  * ══════════════════════════════════════════
  */
 class ActionExecutor(private val context: Context) {
 
-    private val scope           = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val queue           = CommandQueue()
+    /**
+     * The result of executing one AI command:
+     * @param isLogAction  True if the AI sent a LOG (mission done, show final message)
+     * @param displayText  The human message to show in chat (only set if isLogAction=true)
+     * @param report       Structured mission step report to feed back to AI
+     */
+    data class MissionResult(
+        val isLogAction: Boolean,
+        val displayText: String?,
+        val report: String
+    )
+
     private val fileEngine      = FileEngine()
     private val gitManager      = GitManager(context)
     private val shellBridge     = ShellBridge()
     private val hardwareManager = HardwareManager(context)
 
-    /** Last execution feedback — injected into next AI call as context */
-    var lastFeedback: String = ""
-        private set
+    /** Accumulated mission log for this step */
+    private val missionLog = mutableListOf<String>()
 
     companion object {
         @Volatile private var activeExecutor: ActionExecutor? = null
-        fun killAllTasks() { activeExecutor?.queue?.kill() }
+        fun killAllTasks() { /* no-op in v3 — suspend model */ }
     }
 
     init { activeExecutor = this }
 
+    // ══════════════════════════════════════════════════
+    //  PRIMARY ENTRY POINT — LEVEL 5 AGENTIC LOOP
+    // ══════════════════════════════════════════════════
+
     /**
-     * Entry point: parse the AI JSON response and execute.
-     * Call this from the main thread; execution moves to IO internally.
+     * Parse and execute one AI response. Returns a MissionResult so the
+     * calling coroutine (MainActivity) can decide: show result or loop.
+     *
+     * Called on Dispatchers.IO — blocking operations are safe here.
      */
-    fun execute(aiResponse: String) {
+    suspend fun executeAndReport(aiResponse: String): MissionResult {
+        missionLog.clear()
+
         val command = CommandParser.parse(aiResponse) ?: run {
-            lastFeedback = CommandParser.buildFeedback("error", "PARSE", "Could not parse AI response")
-            Logger.error("Parse failure — raw response: ${aiResponse.take(200)}")
-            return
+            val errMsg = "Could not parse AI response: ${aiResponse.take(100)}"
+            Logger.error(errMsg)
+            missionLog.add("✗ PARSE_ERROR: $errMsg")
+            return MissionResult(
+                isLogAction = false,
+                displayText = null,
+                report = compileMissionReport()
+            )
         }
-        queue.enqueue(command)
-        scope.launch { queue.drainWith(this@ActionExecutor) }
-    }
 
-    /**
-     * Dispatch a single command. Called by CommandQueue.drainWith on IO thread.
-     */
-    suspend fun dispatchSingle(cmd: CommandParser.LeoCommand) {
-        Logger.action("▶ ${cmd.action} → target:${cmd.target.take(60)}")
+        if (command.action == LeoProtocol.Action.LOG) {
+            missionLog.add("✓ LOG: ${command.value.take(80)}")
+            return MissionResult(
+                isLogAction = true,
+                displayText = command.value.ifBlank { "(Leo completed the mission)" },
+                report = compileMissionReport()
+            )
+        }
 
-        lastFeedback = try {
-            val result = when (cmd.action) {
-                // ── Conversational LOG (appears in chat) ──────
-                LeoProtocol.Action.LOG -> {
-                    Logger.action("LOG resolved: ${cmd.value.take(80)}")
-                    "chat_message_shown"
-                }
-
-                // ── UI Control (AccessibilityService) ────────
-                LeoProtocol.Action.UI_CONTROL,
-                LeoProtocol.Action.UI_CLICK,
-                LeoProtocol.Action.UI_TYPE,
-                LeoProtocol.Action.UI_SCROLL -> executeUIAction(cmd)
-
-                // ── File System ──────────────────────────────
-                LeoProtocol.Action.FS_READ,
-                LeoProtocol.Action.FS_WRITE,
-                LeoProtocol.Action.FS_DELETE,
-                LeoProtocol.Action.FS_MKDIR  -> executeFileAction(cmd)
-
-                // ── Git ──────────────────────────────────────
-                LeoProtocol.Action.GIT_INIT,
-                LeoProtocol.Action.GIT_PUSH,
-                LeoProtocol.Action.GIT_CLONE -> executeGitAction(cmd)
-
-                // ── Native Hardware (no shell, no SecurityException) ──
-                LeoProtocol.Action.HARDWARE_CONTROL -> executeHardwareAction(cmd)
-
-                // ── Shell (use sparingly, Android 10 restrictions apply) ──
-                LeoProtocol.Action.SHELL_EXEC -> executeShellAction(cmd)
-
-                // ── Wait ─────────────────────────────────────
-                LeoProtocol.Action.WAIT -> {
-                    val ms = cmd.value.toLongOrNull() ?: 500L
-                    Logger.action("⏱ Wait ${ms}ms")
-                    Thread.sleep(ms)
-                    "waited:${ms}ms"
-                }
-
-                else -> {
-                    Logger.warn("Unknown action type: ${cmd.action}")
-                    "unknown_action:${cmd.action}"
-                }
-            }
-            CommandParser.buildFeedback("success", cmd.action, result)
+        val stepResult = try {
+            dispatchSingle(command)
         } catch (e: Exception) {
-            Logger.error("Action [${cmd.action}] threw: ${e.message}")
-            CommandParser.buildFeedback("error", cmd.action, e.message ?: "exception")
+            Logger.error("Action [${command.action}] threw: ${e.message}")
+            "error:${e.message ?: "exception"}"
+        }
+
+        missionLog.add(formatStep(command, stepResult))
+
+        return MissionResult(
+            isLogAction = false,
+            displayText = null,
+            report = compileMissionReport()
+        )
+    }
+
+    // ══════════════════════════════════════════════════
+    //  DISPATCHER — routes command to the right engine
+    // ══════════════════════════════════════════════════
+
+    private suspend fun dispatchSingle(cmd: CommandParser.LeoCommand): String {
+        Logger.action("▶ ${cmd.action}${if (cmd.subAction.isNotEmpty()) ":${cmd.subAction}" else ""} → target='${cmd.target.take(60)}'")
+
+        if (cmd.delayMs > 0) {
+            Logger.action("⏱ Pre-delay: ${cmd.delayMs}ms")
+            Thread.sleep(cmd.delayMs)
+        }
+
+        return when (cmd.action) {
+
+            // ── Conversational output ───────────────────────
+            LeoProtocol.Action.LOG -> {
+                Logger.action("LOG: ${cmd.value.take(80)}")
+                "chat_message_shown"
+            }
+
+            // ── UI_CONTROL (open app + WAIT_FOR sub_action) ─
+            LeoProtocol.Action.UI_CONTROL -> executeUIControl(cmd)
+
+            // ── READ_SCREEN — Leo's eyes ────────────────────
+            LeoProtocol.Action.READ_SCREEN -> {
+                val svc = LeoAccessibilityService.instance
+                    ?: return "accessibility_service_not_connected"
+                val screenText = svc.readScreenText()
+                Logger.action("[EYES] READ_SCREEN complete: ${screenText.length} chars")
+                screenText
+            }
+
+            // ── Standalone WAIT_FOR at root level ───────────
+            LeoProtocol.Action.WAIT_FOR -> {
+                val svc = LeoAccessibilityService.instance
+                    ?: return "accessibility_service_not_connected"
+                svc.waitForNode(cmd.target, cmd.timeoutMs)
+            }
+
+            // ── Legacy UI actions ───────────────────────────
+            LeoProtocol.Action.UI_CLICK,
+            LeoProtocol.Action.UI_TYPE,
+            LeoProtocol.Action.UI_SCROLL -> executeLegacyUIAction(cmd)
+
+            // ── File System ────────────────────────────────
+            LeoProtocol.Action.FS_READ,
+            LeoProtocol.Action.FS_WRITE,
+            LeoProtocol.Action.FS_DELETE,
+            LeoProtocol.Action.FS_MKDIR  -> executeFileAction(cmd)
+
+            // ── Git ────────────────────────────────────────
+            LeoProtocol.Action.GIT_INIT,
+            LeoProtocol.Action.GIT_PUSH,
+            LeoProtocol.Action.GIT_CLONE -> executeGitAction(cmd)
+
+            // ── Native Hardware ────────────────────────────
+            LeoProtocol.Action.HARDWARE_CONTROL -> executeHardwareAction(cmd)
+
+            // ── Shell ──────────────────────────────────────
+            LeoProtocol.Action.SHELL_EXEC -> {
+                Logger.action("Shell: ${cmd.value.take(80)}")
+                val output = shellBridge.exec(cmd.value)
+                Logger.action("Shell output: ${output.take(200)}")
+                output.take(1000)
+            }
+
+            // ── Static Wait (fallback) ─────────────────────
+            LeoProtocol.Action.WAIT -> {
+                val ms = cmd.value.toLongOrNull() ?: 500L
+                Logger.action("⏱ Static wait: ${ms}ms")
+                Thread.sleep(ms)
+                "waited:${ms}ms"
+            }
+
+            else -> {
+                Logger.warn("Unknown action: ${cmd.action}")
+                "unknown_action:${cmd.action}"
+            }
         }
     }
 
     // ══════════════════════════════════════════════════
-    //  HANDLERS
+    //  UI_CONTROL HANDLER — handles sub_actions
     // ══════════════════════════════════════════════════
 
-    private fun executeUIAction(cmd: CommandParser.LeoCommand): String {
+    private fun executeUIControl(cmd: CommandParser.LeoCommand): String {
         val svc = LeoAccessibilityService.instance
             ?: return "accessibility_service_not_connected"
 
-        return when (cmd.action) {
-            LeoProtocol.Action.UI_CONTROL -> {
-                // Open app by package name, or perform generic UI command
-                if (cmd.value == "open" && cmd.target.contains(".")) {
+        return when (cmd.subAction) {
+
+            // ── WAIT_FOR: dynamic patience ──────────────────
+            LeoProtocol.SubAction.WAIT_FOR -> {
+                svc.waitForNode(cmd.target, cmd.timeoutMs)
+            }
+
+            // ── Default: open app or click element ──────────
+            else -> {
+                if (cmd.value.lowercase() == "open" && cmd.target.contains(".")) {
                     val launched = svc.launchAppByPackage(cmd.target)
                     Logger.action("UI_CONTROL: launch ${cmd.target} → $launched")
                     if (launched) "app_opened:${cmd.target}" else "launch_failed:${cmd.target}"
+                } else if (cmd.value.lowercase() == "tap" || cmd.value.lowercase() == "click") {
+                    val result = svc.findNodeAndClick(
+                        textContent = cmd.target.takeIf { it.isNotEmpty() },
+                        viewId      = null
+                    )
+                    if (result) "clicked:${cmd.target}" else "click_failed:${cmd.target}"
                 } else {
                     val result = svc.findNodeAndClick(
                         textContent = cmd.value.takeIf { it.isNotEmpty() },
@@ -138,16 +217,23 @@ class ActionExecutor(private val context: Context) {
                     if (result) "clicked:${cmd.target}" else "click_failed:node_not_found"
                 }
             }
+        }
+    }
+
+    private fun executeLegacyUIAction(cmd: CommandParser.LeoCommand): String {
+        val svc = LeoAccessibilityService.instance
+            ?: return "accessibility_service_not_connected"
+        return when (cmd.action) {
             LeoProtocol.Action.UI_CLICK -> {
                 val result = svc.findNodeAndClick(
                     textContent = cmd.value.takeIf { it.isNotEmpty() },
                     viewId      = cmd.target.takeIf { it.isNotEmpty() }
                 )
-                if (result) "clicked:${cmd.target}" else "click_failed:node_not_found"
+                if (result) "clicked:${cmd.target}" else "click_failed"
             }
             LeoProtocol.Action.UI_TYPE -> {
                 val result = svc.injectTextToNode(
-                    viewId    = cmd.target.takeIf { it.isNotEmpty() },
+                    viewId     = cmd.target.takeIf { it.isNotEmpty() },
                     textToType = cmd.value
                 )
                 if (result) "typed:${cmd.target}" else "type_failed"
@@ -156,9 +242,13 @@ class ActionExecutor(private val context: Context) {
                 val result = svc.performScroll(cmd.value.ifEmpty { "down" })
                 if (result) "scrolled:${cmd.value}" else "scroll_failed"
             }
-            else -> "unhandled_ui_action:${cmd.action}"
+            else -> "unhandled:${cmd.action}"
         }
     }
+
+    // ══════════════════════════════════════════════════
+    //  FILE, GIT, HARDWARE HANDLERS
+    // ══════════════════════════════════════════════════
 
     private fun executeFileAction(cmd: CommandParser.LeoCommand): String {
         return when (cmd.action) {
@@ -195,13 +285,6 @@ class ActionExecutor(private val context: Context) {
         }
     }
 
-    /**
-     * HARDWARE_CONTROL — uses native Android APIs only.
-     * No shell, no SecurityException, works on API 29+.
-     *
-     * Supported targets: flashlight, vibrate, battery
-     * Values: "on" | "off" | duration_ms (vibrate) | "check" (battery)
-     */
     private fun executeHardwareAction(cmd: CommandParser.LeoCommand): String {
         return when (cmd.target.lowercase()) {
             HardwareManager.TARGET_FLASHLIGHT -> {
@@ -222,10 +305,19 @@ class ActionExecutor(private val context: Context) {
         }
     }
 
-    private fun executeShellAction(cmd: CommandParser.LeoCommand): String {
-        Logger.action("Shell: ${cmd.value.take(80)}")
-        val output = shellBridge.exec(cmd.value)
-        Logger.action("Shell output: ${output.take(200)}")
-        return output.take(1000)
+    // ══════════════════════════════════════════════════
+    //  MISSION REPORT BUILDER
+    // ══════════════════════════════════════════════════
+
+    private fun formatStep(cmd: CommandParser.LeoCommand, result: String): String {
+        val actionLabel = if (cmd.subAction.isNotEmpty()) "${cmd.action}:${cmd.subAction}" else cmd.action
+        val success = !result.startsWith("error:") && !result.startsWith("failed") && !result.startsWith("timeout:")
+        val icon = if (success) "✓" else "✗"
+        return "$icon $actionLabel(target='${cmd.target.take(40)}') → $result"
+    }
+
+    private fun compileMissionReport(): String {
+        if (missionLog.isEmpty()) return "no_steps_executed"
+        return missionLog.joinToString("\n")
     }
 }
