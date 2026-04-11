@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="6dp">
+
+    <!-- Right-aligned: timestamp + bubble -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end|center_vertical">
+
+        <!-- Timestamp -->
+        <TextView
+            android:id="@+id/tvUserTimestamp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#333333"
+            android:textSize="9sp"
+            android:fontFamily="monospace"
+            android:paddingEnd="8dp" />
+
+        <!-- User avatar chip: "JD" -->
+        <TextView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:text="JD"
+            android:textColor="#000000"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace"
+            android:background="@drawable/avatar_user"
+            android:gravity="center"
+            android:layout_marginStart="8dp" />
+
+    </LinearLayout>
+
+    <!-- Message bubble — right-aligned -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:layout_marginTop="4dp">
+
+        <TextView
+            android:id="@+id/tvUserMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxWidth="260dp"
+            android:background="@drawable/bubble_user"
+            android:textColor="#000000"
+            android:textSize="13sp"
+            android:fontFamily="monospace"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="10dp"
+            android:lineSpacingMultiplier="1.3"
+            android:textIsSelectable="true" />
+
+    </LinearLayout>
+
+</LinearLayout>
