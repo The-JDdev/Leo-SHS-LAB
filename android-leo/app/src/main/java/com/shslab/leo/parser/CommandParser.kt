@@ -1,20 +1,25 @@
 package com.shslab.leo.parser
 
 import com.shslab.leo.core.Logger
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
  * ══════════════════════════════════════════
- *  LEO COMMAND PARSER — SHS LAB v3
+ *  LEO COMMAND PARSER — SHS LAB v4
+ *  Absolute Sovereignty Edition
  *
- *  Strips markdown, extracts valid JSON.
- *  Validates against Leo command schema.
- *  Supports sub_action and timeout_ms for WAIT_FOR.
+ *  Supports BOTH formats:
+ *  • Single JSON object: {"action":"LOG","value":"done"}
+ *  • JSON array:  [{"action":"UI_CONTROL",...}, {"action":"LOG",...}]
+ *
+ *  parseMulti() is the primary entry point.
  * ══════════════════════════════════════════
  */
 object CommandParser {
 
     private val JSON_OBJECT_REGEX = Regex("\\{[\\s\\S]*\\}", RegexOption.DOT_MATCHES_ALL)
+    private val JSON_ARRAY_REGEX  = Regex("\\[[\\s\\S]*\\]",  RegexOption.DOT_MATCHES_ALL)
 
     data class LeoCommand(
         val action: String,
@@ -27,105 +32,146 @@ object CommandParser {
         val raw: JSONObject
     )
 
-    /**
-     * Parse AI response string into a LeoCommand.
-     * @return LeoCommand or null if invalid/unparseable
-     */
-    fun parse(aiResponse: String): LeoCommand? {
-        Logger.net("[Leo]: Parsing AI Payload...")
+    // ══════════════════════════════════════════
+    //  PRIMARY: Parse array OR single object
+    // ══════════════════════════════════════════
 
+    /**
+     * Primary parser — handles both JSON arrays and single JSON objects.
+     * This is the ONLY entry point called by ActionExecutor.
+     *
+     * @return List of LeoCommands in execution order, or empty list on failure
+     */
+    fun parseMulti(aiResponse: String): List<LeoCommand> {
         val trimmed = aiResponse.trim()
-        val jsonString = extractJson(trimmed) ?: run {
-            Logger.error("Parser: no valid JSON found in response")
-            Logger.raw("Raw response: ${trimmed.take(200)}")
-            return null
+        Logger.net("[Parser]: Parsing AI response (${trimmed.length} chars)...")
+
+        // Extract raw JSON (strips markdown, prose, etc.)
+        val jsonStr = extractAnyJson(trimmed) ?: run {
+            Logger.error("[Parser]: No valid JSON found")
+            Logger.raw("Raw: ${trimmed.take(200)}")
+            return emptyList()
         }
 
+        return when {
+            jsonStr.startsWith("[") -> parseJsonArray(jsonStr)
+            jsonStr.startsWith("{") -> {
+                val cmd = parseObject(JSONObject(jsonStr))
+                if (cmd != null) listOf(cmd) else emptyList()
+            }
+            else -> emptyList()
+        }
+    }
+
+    private fun parseJsonArray(jsonStr: String): List<LeoCommand> {
         return try {
-            val obj       = JSONObject(jsonString)
-            val action    = obj.optString("action", "").uppercase()
-            val subAction = obj.optString("sub_action", "").uppercase()
-            val target    = obj.optString("target", "")
-            val value     = obj.optString("value", "")
+            val arr = JSONArray(jsonStr)
+            val commands = mutableListOf<LeoCommand>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val cmd = parseObject(obj)
+                if (cmd != null) {
+                    commands.add(cmd)
+                    Logger.action("[Parser]: Step ${i+1} → ${cmd.action}${if (cmd.subAction.isNotEmpty()) ":${cmd.subAction}" else ""}")
+                }
+            }
+            Logger.action("[Parser]: ${commands.size} commands in array")
+            commands
+        } catch (e: Exception) {
+            Logger.error("[Parser]: Array parse failed: ${e.message}")
+            emptyList()
+        }
+    }
+
+    internal fun parseObject(obj: JSONObject): LeoCommand? {
+        return try {
+            val action    = obj.optString("action", "").uppercase().trim()
+            val subAction = obj.optString("sub_action", "").uppercase().trim()
+            val target    = obj.optString("target", "").trim()
+            val value     = obj.optString("value", obj.optString("message", "")).trim()
             val timeoutMs = obj.optLong("timeout_ms", 10000L)
 
             if (action.isEmpty()) {
-                Logger.error("Parser: missing 'action' field")
+                Logger.error("[Parser]: Missing 'action' field in object")
                 return null
             }
 
-            val meta      = obj.optJSONObject("meta")
-            val priority  = meta?.optInt("priority", 1) ?: 1
-            val delayMs   = meta?.optLong("delay_ms", 0L) ?: 0L
+            val meta     = obj.optJSONObject("meta")
+            val priority = meta?.optInt("priority", 1) ?: 1
+            val delayMs  = meta?.optLong("delay_ms", 0L) ?: 0L
 
-            val cmd = LeoCommand(action, subAction, target, value, timeoutMs, priority, delayMs, obj)
-            Logger.action("[Leo]: Dispatching → $action${if (subAction.isNotEmpty()) ":$subAction" else ""} | target='$target'")
-            cmd
+            LeoCommand(action, subAction, target, value, timeoutMs, priority, delayMs, obj)
         } catch (e: Exception) {
-            Logger.error("Parser JSON exception: ${e.message}")
+            Logger.error("[Parser]: Object parse failed: ${e.message}")
             null
         }
     }
 
-    private fun extractJson(input: String): String? {
-        if (input.startsWith("{")) return cleanJsonString(input)
+    // ══════════════════════════════════════════
+    //  JSON EXTRACTION — strips markdown/prose
+    // ══════════════════════════════════════════
 
+    private fun extractAnyJson(input: String): String? {
+        // Case 1: Direct JSON (array or object)
+        if (input.startsWith("[") || input.startsWith("{")) {
+            return cleanJson(input)
+        }
+
+        // Case 2: Markdown code block ```json [...] ``` or ```json {...} ```
         val blockMatch = Regex("```(?:json)?\\s*([\\s\\S]*?)```").find(input)
         if (blockMatch != null) {
             val inner = blockMatch.groupValues[1].trim()
-            if (inner.startsWith("{")) return cleanJsonString(inner)
+            if (inner.startsWith("[") || inner.startsWith("{")) return cleanJson(inner)
         }
 
+        // Case 3: JSON array embedded in prose
+        val arrayMatch = JSON_ARRAY_REGEX.find(input)
+        if (arrayMatch != null) return cleanJson(arrayMatch.value)
+
+        // Case 4: JSON object embedded in prose
         val objectMatch = JSON_OBJECT_REGEX.find(input)
-        if (objectMatch != null) return cleanJsonString(objectMatch.value)
+        if (objectMatch != null) return cleanJson(objectMatch.value)
 
         return null
     }
 
-    private fun cleanJsonString(raw: String): String {
-        return raw
-            .trimIndent()
-            .trim()
-            .replace("\u200B", "")
-            .replace("\uFEFF", "")
-    }
+    private fun cleanJson(raw: String): String = raw
+        .trimIndent()
+        .trim()
+        .replace("\u200B", "")
+        .replace("\uFEFF", "")
+
+    // ══════════════════════════════════════════
+    //  HELPERS for MainActivity
+    // ══════════════════════════════════════════
 
     /**
-     * True if this response is a LOG action (final conversational reply).
+     * True if the last command in the response is a LOG (mission done).
+     * Used to detect mission completion without full parse.
      */
     fun isLogAction(aiResponse: String): Boolean {
-        val json = extractJson(aiResponse.trim()) ?: return false
-        return try {
-            JSONObject(json).optString("action", "").uppercase() == "LOG"
-        } catch (_: Exception) { false }
+        val cmds = parseMulti(aiResponse)
+        return cmds.isNotEmpty() && cmds.last().action == "LOG"
     }
 
     /**
-     * Extract the human-readable display text from an AI response.
-     * Returns LOG value if action=LOG, otherwise a short action summary.
+     * Backward-compatible single-object parse.
+     */
+    fun parse(aiResponse: String): LeoCommand? = parseMulti(aiResponse).firstOrNull()
+
+    /**
+     * Extract the display text — returns the LOG value from the last LOG command in the array.
      */
     fun extractDisplayText(aiResponse: String): String {
-        val trimmed   = aiResponse.trim()
-        val jsonString = extractJson(trimmed) ?: return trimmed.take(500)
-        return try {
-            val obj    = JSONObject(jsonString)
-            val action = obj.optString("action", "").uppercase()
-            val value  = obj.optString("value", "")
-            val target = obj.optString("target", "")
-            when {
-                action == "LOG"  -> value.ifBlank { "(no message)" }
-                action.isNotEmpty() && target.isNotEmpty() -> "⚡ $action → $target"
-                action.isNotEmpty() -> "⚡ $action executed"
-                else -> trimmed.take(500)
-            }
-        } catch (_: Exception) {
-            trimmed.take(500)
+        val cmds = parseMulti(aiResponse)
+        val log  = cmds.lastOrNull { it.action == "LOG" }
+        return when {
+            log != null && log.value.isNotBlank() -> log.value
+            cmds.isNotEmpty() -> "⚡ ${cmds.size} action${if (cmds.size > 1) "s" else ""} planned"
+            else -> aiResponse.trim().take(500)
         }
     }
 
-    /**
-     * Build a structured feedback JSON for the mission reporting loop.
-     */
     fun buildFeedback(status: String, action: String, message: String): String {
         return JSONObject().apply {
             put("status", status)
@@ -134,4 +180,6 @@ object CommandParser {
             put("timestamp", System.currentTimeMillis())
         }.toString()
     }
+
+    fun raw(text: String) = Logger.raw(text)
 }
