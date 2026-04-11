@@ -106,6 +106,33 @@ object CommandParser {
     }
 
     /**
+     * Extract the human-readable display text from an AI response.
+     *
+     * Priority:
+     * 1. action=LOG → return its "value" (Leo's spoken reply)
+     * 2. Any other valid JSON action → return a one-liner summary
+     * 3. Not JSON / parse failure → return raw response trimmed
+     */
+    fun extractDisplayText(aiResponse: String): String {
+        val trimmed = aiResponse.trim()
+        val jsonString = extractJson(trimmed) ?: return trimmed.take(500)
+        return try {
+            val obj    = JSONObject(jsonString)
+            val action = obj.optString("action", "").uppercase()
+            val value  = obj.optString("value", "")
+            val target = obj.optString("target", "")
+            when {
+                action == "LOG"  -> value.ifBlank { "(no message)" }
+                action.isNotEmpty() && value.isNotEmpty() -> "⚡ $action → $target"
+                action.isNotEmpty() -> "⚡ $action executed"
+                else -> trimmed.take(500)
+            }
+        } catch (_: Exception) {
+            trimmed.take(500)
+        }
+    }
+
+    /**
      * Build a structured feedback JSON for the next AI call.
      * Closes the internal feedback loop (Phase 2).
      */
