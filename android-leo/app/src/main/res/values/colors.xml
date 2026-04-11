@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    LEO COLOR PALETTE — SHS LAB
+    Extracted from the SHS LAB logo asset.
+    4-color system: Cyan, Magenta, Yellow, Purple
+-->
+<resources>
+    <!-- ── PRIMARY BRAND PALETTE ── -->
+    <color name="cyan"    >#00BCD4</color>  <!-- Logo cyan accent -->
+    <color name="magenta" >#E91E8C</color>  <!-- Logo magenta/pink -->
+    <color name="yellow"  >#FFD600</color>  <!-- Logo yellow nodes -->
+    <color name="purple"  >#6B35A5</color>  <!-- Logo center purple -->
+
+    <!-- ── TERMINAL VARIANTS ── -->
+    <color name="cyan_bright"   >#00E5FF</color>  <!-- Terminal text -->
+    <color name="cyan_dim"      >#00838F</color>  <!-- Dimmed elements -->
+    <color name="magenta_dark"  >#880E4F</color>  <!-- Error states -->
+    <color name="green_terminal">#69F0AE</color>  <!-- FS operations -->
+    <color name="red_kill"      >#FF1744</color>  <!-- Kill switch -->
+    <color name="orange_warn"   >#FFAB40</color>  <!-- Warnings -->
+    <color name="blue_net"      >#40C4FF</color>  <!-- Network ops -->
+
+    <!-- ── BACKGROUNDS ── -->
+    <color name="bg_black"      >#000000</color>
+    <color name="bg_near_black" >#0A0A0A</color>
+    <color name="bg_dark"       >#080808</color>
+    <color name="bg_surface"    >#1A1A1A</color>
+    <color name="bg_elevated"   >#1E1E1E</color>
+
+    <!-- ── OVERLAY BUBBLE ── -->
+    <color name="bubble_bg"     >#CC000000</color>  <!-- 80% opacity black -->
+    <color name="bubble_border" >#00E5FF</color>
+    <color name="status_active" >#E91E8C</color>
+
+    <!-- ── STATUS BAR ── -->
+    <color name="statusBar"     >#000000</color>
+    <color name="navigationBar" >#000000</color>
+</resources>
