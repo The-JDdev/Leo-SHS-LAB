@@ -1,0 +1,89 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.shslab.leo'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.shslab.leo"
+        minSdk 29
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        vectorDrawables.useSupportLibrary = true
+    }
+
+    // ══════════════════════════════════════════
+    //  ABI SPLITS — 5 APK VARIANTS
+    //  armeabi-v7a | arm64-v8a | x86 | x86_64 | universal
+    // ══════════════════════════════════════════
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            universalApk true   // Also produce a universal APK covering all ABIs
+        }
+    }
+
+    // Unique version codes per ABI (required for Play Store, good practice)
+    project.ext.abiCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86': 3, 'x86_64': 4]
+
+    android.applicationVariants.all { variant ->
+        variant.outputs.each { output ->
+            def abiName = output.getFilter(com.android.build.OutputFile.ABI)
+            def abiCode  = project.ext.abiCodes.get(abiName)
+            if (abiCode != null) {
+                output.versionCodeOverride = abiCode * 1000 + variant.versionCode
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            debuggable true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    packagingOptions {
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES',
+                'META-INF/LICENSE',
+                'META-INF/LICENSE.txt',
+                'META-INF/NOTICE',
+                'META-INF/*.kotlin_module'
+            ]
+        }
+    }
+}
+
+dependencies {
+    implementation "androidx.security:security-crypto:1.1.0-alpha06"
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
+    implementation "org.json:json:20231013"
+    implementation "androidx.core:core-ktx:1.12.0"
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "com.google.android.material:material:1.11.0"
+    implementation "androidx.lifecycle:lifecycle-service:2.7.0"
+}
