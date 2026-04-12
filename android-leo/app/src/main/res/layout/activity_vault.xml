@@ -43,18 +43,184 @@
 
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1px"
-            android:background="#1A1A1A" />
+        <View android:layout_width="match_parent" android:layout_height="1px" android:background="#1A1A1A" />
 
-        <!-- ══ PROVIDER SELECTOR ══ -->
+        <!-- ══ AGENT NAME ══ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
-            android:paddingTop="20dp"
+            android:paddingTop="18dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="AGENT NAME"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.2"
+                android:paddingBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etAgentName"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/input_background"
+                android:textColor="#00E5FF"
+                android:textColorHint="#334455"
+                android:hint="Leo"
+                android:textSize="14sp"
+                android:fontFamily="monospace"
+                android:paddingHorizontal="10dp"
+                android:inputType="text"
+                android:maxLines="1"
+                android:singleLine="true" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Custom name shown in the header and greeting"
+                android:textColor="#444444"
+                android:textSize="9sp"
+                android:fontFamily="monospace"
+                android:paddingTop="4dp" />
+
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1px" android:background="#111111" android:layout_marginHorizontal="16dp" android:layout_marginTop="12dp" />
+
+        <!-- ══ APPEARANCE ══ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="APPEARANCE"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.2"
+                android:paddingBottom="10dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Dark Mode"
+                    android:textColor="#CCCCCC"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace" />
+
+                <Switch
+                    android:id="@+id/switchDarkMode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:thumbTint="#00E5FF"
+                    android:trackTint="#222222" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1px" android:background="#111111" android:layout_marginHorizontal="16dp" android:layout_marginTop="12dp" />
+
+        <!-- ══ VOICE SETTINGS ══ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="VOICE"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.2"
+                android:paddingBottom="10dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingBottom="10dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Voice Input (Mic)"
+                    android:textColor="#CCCCCC"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace" />
+
+                <Switch
+                    android:id="@+id/switchVoiceInput"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:thumbTint="#E91E8C"
+                    android:trackTint="#222222" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Voice Output (TTS)"
+                    android:textColor="#CCCCCC"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace" />
+
+                <Switch
+                    android:id="@+id/switchTTS"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="false"
+                    android:thumbTint="#FFD600"
+                    android:trackTint="#222222" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1px" android:background="#1A1A1A" android:layout_marginTop="12dp" />
+
+        <!-- ══ AI PROVIDER ══ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="16dp"
             android:paddingBottom="8dp">
 
             <TextView
@@ -67,7 +233,6 @@
                 android:letterSpacing="0.2"
                 android:paddingBottom="8dp" />
 
-            <!-- Provider radio row -->
             <RadioGroup
                 android:id="@+id/rgProvider"
                 android:layout_width="match_parent"
@@ -81,7 +246,7 @@
                     android:layout_weight="1"
                     android:text="OpenRouter"
                     android:textColor="#00E5FF"
-                    android:textSize="10sp"
+                    android:textSize="9sp"
                     android:fontFamily="monospace"
                     android:buttonTint="#00E5FF" />
 
@@ -92,7 +257,7 @@
                     android:layout_weight="1"
                     android:text="OpenAI"
                     android:textColor="#00E5FF"
-                    android:textSize="10sp"
+                    android:textSize="9sp"
                     android:fontFamily="monospace"
                     android:buttonTint="#00E5FF" />
 
@@ -103,7 +268,7 @@
                     android:layout_weight="1"
                     android:text="Claude"
                     android:textColor="#00E5FF"
-                    android:textSize="10sp"
+                    android:textSize="9sp"
                     android:fontFamily="monospace"
                     android:buttonTint="#00E5FF" />
 
@@ -114,7 +279,7 @@
                     android:layout_weight="1"
                     android:text="Gemini"
                     android:textColor="#00E5FF"
-                    android:textSize="10sp"
+                    android:textSize="9sp"
                     android:fontFamily="monospace"
                     android:buttonTint="#00E5FF" />
 
@@ -129,7 +294,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
-            android:paddingTop="16dp"
+            android:paddingTop="14dp"
             android:paddingBottom="4dp">
 
             <TextView
@@ -184,7 +349,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
-            android:paddingTop="14dp"
+            android:paddingTop="12dp"
             android:paddingBottom="4dp">
 
             <TextView
@@ -204,7 +369,7 @@
                 android:background="@drawable/input_background"
                 android:textColor="#00E5FF"
                 android:textColorHint="#334455"
-                android:hint="e.g. mistralai/mistral-7b-instruct"
+                android:hint="e.g. google/gemini-flash-1.5"
                 android:textSize="12sp"
                 android:fontFamily="monospace"
                 android:paddingHorizontal="10dp"
@@ -220,7 +385,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
-            android:paddingTop="14dp"
+            android:paddingTop="12dp"
             android:paddingBottom="4dp">
 
             <TextView
@@ -241,7 +406,7 @@
                 android:textColor="#00E5FF"
                 android:textColorHint="#334455"
                 android:hint="https://openrouter.ai/api/v1/chat/completions"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:fontFamily="monospace"
                 android:paddingHorizontal="10dp"
                 android:inputType="textUri"
@@ -256,7 +421,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
-            android:paddingTop="14dp"
+            android:paddingTop="12dp"
             android:paddingBottom="4dp">
 
             <TextView
@@ -296,7 +461,7 @@
             android:textSize="10sp"
             android:fontFamily="monospace"
             android:gravity="center"
-            android:paddingTop="12dp"
+            android:paddingTop="10dp"
             android:paddingHorizontal="16dp" />
 
         <!-- ══ SAVE BUTTON ══ -->
@@ -305,7 +470,7 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginHorizontal="16dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="14dp"
             android:layout_marginBottom="8dp"
             android:text="SAVE TO VAULT"
             android:textSize="13sp"
