@@ -39,7 +39,7 @@ class ActionExecutor(private val context: Context) {
 
     private val fileEngine      = FileEngine()
     private val gitManager      = GitManager(context)
-    private val shellBridge     = ShellBridge()
+    private val shellBridge     = ShellBridge(context)   // context-aware for GitHub token injection
     private val hardwareManager = HardwareManager(context)
     private val browserEngine   by lazy { LeoBrowserEngine.getInstance(context) }
 
