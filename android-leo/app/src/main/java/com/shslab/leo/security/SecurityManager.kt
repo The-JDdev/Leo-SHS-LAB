@@ -120,6 +120,34 @@ object SecurityManager {
 
     fun getGitHubToken(): String = retrieve(KEY_GITHUB_TOKEN)
 
+    // ── Agent Name (custom) ────────────────────────────
+    private const val KEY_AGENT_NAME = "agent_name"
+    fun setAgentName(name: String) {
+        prefs?.edit()?.putString(KEY_AGENT_NAME, name.trim().ifEmpty { "Leo" })?.apply()
+    }
+    fun getAgentName(): String = prefs?.getString(KEY_AGENT_NAME, "Leo") ?: "Leo"
+
+    // ── Dark / Light Mode ──────────────────────────────
+    private const val KEY_DARK_MODE = "dark_mode"
+    fun setDarkMode(enabled: Boolean) {
+        prefs?.edit()?.putBoolean(KEY_DARK_MODE, enabled)?.apply()
+    }
+    fun isDarkMode(): Boolean = prefs?.getBoolean(KEY_DARK_MODE, true) ?: true
+
+    // ── Voice Input (STT) ──────────────────────────────
+    private const val KEY_VOICE_ENABLED = "voice_enabled"
+    fun setVoiceEnabled(enabled: Boolean) {
+        prefs?.edit()?.putBoolean(KEY_VOICE_ENABLED, enabled)?.apply()
+    }
+    fun isVoiceEnabled(): Boolean = prefs?.getBoolean(KEY_VOICE_ENABLED, true) ?: true
+
+    // ── TTS (Voice Output) ─────────────────────────────
+    private const val KEY_TTS_ENABLED = "tts_enabled"
+    fun setTTSEnabled(enabled: Boolean) {
+        prefs?.edit()?.putBoolean(KEY_TTS_ENABLED, enabled)?.apply()
+    }
+    fun isTTSEnabled(): Boolean = prefs?.getBoolean(KEY_TTS_ENABLED, false) ?: false
+
     /** Wipe all vault data (emergency reset) */
     fun nukeVault() {
         prefs?.edit()?.clear()?.apply()
