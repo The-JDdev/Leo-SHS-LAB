@@ -37,13 +37,53 @@ class SpeechManager(private val context: Context) {
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.language = Locale.US
-                tts?.setSpeechRate(0.95f)
-                tts?.setPitch(0.9f)
+                // Sweet, warm, powerful voice profile
+                // Slightly slower = more deliberate, trustworthy
+                tts?.setSpeechRate(0.88f)
+                // Slightly lower pitch = deeper, more authoritative yet warm
+                tts?.setPitch(0.85f)
+                // Try to find the highest quality voice available
+                selectBestVoice()
                 ttsReady = true
-                Logger.system("[VOICE] TTS engine ready")
+                Logger.system("[VOICE] TTS engine ready — sweet & powerful profile")
             } else {
                 Logger.warn("[VOICE] TTS init failed: $status")
             }
+        }
+    }
+
+    /**
+     * Select the best available TTS voice.
+     * Prefers: female US English, neural/premium quality.
+     * Falls back to any EN-US voice if none found.
+     */
+    private fun selectBestVoice() {
+        try {
+            val voices = tts?.voices ?: return
+            // Priority order: neural > premium > high quality female US
+            val best = voices
+                .filter { v ->
+                    !v.isNetworkConnectionRequired &&
+                    (v.locale.language == "en" || v.locale.toLanguageTag().startsWith("en"))
+                }
+                .sortedWith(compareByDescending { v ->
+                    val n = v.name.lowercase()
+                    when {
+                        n.contains("neural")  || n.contains("wavenet") -> 100
+                        n.contains("premium") || n.contains("enhanced") -> 90
+                        n.contains("female")  || n.contains("woman") -> 80
+                        n.contains("en-us")   || n.contains("en_us") -> 70
+                        else -> 50
+                    }
+                })
+                .firstOrNull()
+
+            if (best != null) {
+                tts?.voice = best
+                Logger.system("[VOICE] Selected TTS voice: ${best.name} (quality=${best.quality})")
+            }
+        } catch (e: Exception) {
+            Logger.warn("[VOICE] Voice selection failed: ${e.message}")
         }
     }
 
