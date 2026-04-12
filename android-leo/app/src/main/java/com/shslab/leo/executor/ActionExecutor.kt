@@ -2,6 +2,7 @@ package com.shslab.leo.executor
 
 import android.content.Context
 import com.shslab.leo.accessibility.LeoAccessibilityService
+import com.shslab.leo.browser.LeoBrowserEngine
 import com.shslab.leo.core.LeoProtocol
 import com.shslab.leo.core.Logger
 import com.shslab.leo.file.FileEngine
@@ -11,31 +12,36 @@ import com.shslab.leo.parser.CommandParser
 import com.shslab.leo.shell.ShellBridge
 
 /**
- * ══════════════════════════════════════════
- *  LEO ACTION EXECUTOR — ABSOLUTE SOVEREIGNTY
- *  SHS LAB v4 — OMNIPOTENT MISSION ENGINE
+ * ══════════════════════════════════════════════════════
+ *  LEO ACTION EXECUTOR — APEX v5 — REACT SINGLE-STEP
+ *  SHS LAB — OMNIPOTENT MISSION ENGINE
  *
- *  Executes JSON arrays of commands sequentially.
- *  Every step compiles into a mission log.
- *  Full sub_action support: OPEN_APP, CLICK, TYPE,
- *  LONG_PRESS, SCROLL, WAIT_FOR, BACK, HOME.
- *  Expanded hardware: volume, brightness, wifi, camera.
- * ══════════════════════════════════════════
+ *  Executes ONE command at a time (ReAct architecture).
+ *  Supports all engines:
+ *   - AccessibilityService (UI_CONTROL)
+ *   - LeoBrowserEngine (BROWSER_*)
+ *   - ShellBridge (TERMINAL_EXEC)
+ *   - FileEngine (FS_*)
+ *   - HardwareManager (HARDWARE_CONTROL)
+ *   - GitManager (GIT_*)
+ *
+ *  Returns StepResult with result string for AI feedback.
+ * ══════════════════════════════════════════════════════
  */
 class ActionExecutor(private val context: Context) {
 
-    data class MissionResult(
-        val isLogAction: Boolean,
-        val displayText: String?,
-        val report: String
+    data class StepResult(
+        val isMissionComplete: Boolean,
+        val completionMessage: String?,
+        val result: String,
+        val isError: Boolean
     )
 
     private val fileEngine      = FileEngine()
     private val gitManager      = GitManager(context)
     private val shellBridge     = ShellBridge()
     private val hardwareManager = HardwareManager(context)
-
-    private val missionLog = mutableListOf<String>()
+    private val browserEngine   by lazy { LeoBrowserEngine.getInstance(context) }
 
     companion object {
         @Volatile private var activeExecutor: ActionExecutor? = null
@@ -45,99 +51,169 @@ class ActionExecutor(private val context: Context) {
     init { activeExecutor = this }
 
     // ══════════════════════════════════════════════════
-    //  PRIMARY: Execute full command array
+    //  PRIMARY: Execute a single command (ReAct step)
     // ══════════════════════════════════════════════════
 
-    /**
-     * Parse + execute the full array of commands from one AI response.
-     * Stops at the first LOG action (mission done) or runs all steps.
-     *
-     * Called on Dispatchers.IO — all blocking operations safe here.
-     */
-    suspend fun executeAndReport(aiResponse: String): MissionResult {
-        missionLog.clear()
+    suspend fun executeSingle(cmd: CommandParser.LeoCommand): StepResult {
 
-        val commands = CommandParser.parseMulti(aiResponse)
-
-        if (commands.isEmpty()) {
-            val errMsg = "No parseable commands in AI response"
-            Logger.error(errMsg)
-            missionLog.add("✗ PARSE_ERROR: ${aiResponse.take(100)}")
-            return MissionResult(false, null, compileMissionReport())
+        // MISSION_COMPLETE — full mission done
+        if (cmd.action == LeoProtocol.Action.MISSION_COMPLETE ||
+            cmd.action == LeoProtocol.Action.LOG) {
+            val message = cmd.value.ifBlank {
+                cmd.raw.optString("message", "Mission complete, JD.")
+            }
+            Logger.action("[EXEC] MISSION_COMPLETE — message ready")
+            return StepResult(
+                isMissionComplete = true,
+                completionMessage = message,
+                result = "mission_complete",
+                isError = false
+            )
         }
 
-        Logger.action("[EXEC] Executing ${commands.size} command${if (commands.size > 1) "s" else ""}")
+        Logger.action("[EXEC] ${cmd.action}${if (cmd.subAction.isNotEmpty()) ":${cmd.subAction}" else ""} target='${cmd.target.take(40)}'")
 
-        for ((index, cmd) in commands.withIndex()) {
-            val stepNum = index + 1
-
-            // LOG = mission done — extract message and return immediately
-            if (cmd.action == LeoProtocol.Action.LOG) {
-                val message = cmd.value.ifBlank { cmd.raw.optString("message", "Mission complete.") }
-                missionLog.add("✓ [Step $stepNum] LOG → display message to JD")
-                Logger.action("[EXEC] Mission complete after $stepNum step(s)")
-                return MissionResult(true, message, compileMissionReport())
-            }
-
-            // Execute the action
-            Logger.action("[EXEC] Step $stepNum/${commands.size}: ${cmd.action}${if (cmd.subAction.isNotEmpty()) ":${cmd.subAction}" else ""}")
-            val stepResult = try {
-                dispatchSingle(cmd)
-            } catch (e: Exception) {
-                Logger.error("[EXEC] Step $stepNum threw: ${e.message}")
-                "error:${e.message ?: "exception"}"
-            }
-
-            missionLog.add(formatStep(stepNum, cmd, stepResult))
+        return try {
+            if (cmd.delayMs > 0) Thread.sleep(cmd.delayMs)
+            val result = dispatchSingle(cmd)
+            val isErr  = result.startsWith("error:") || result.startsWith("timeout:") ||
+                         result.startsWith("failed") || result.contains("not_found") ||
+                         result.startsWith("launch_failed")
+            Logger.action("[EXEC] Result: ${result.take(120)}")
+            StepResult(false, null, result, isErr)
+        } catch (e: Exception) {
+            val err = "error:${e.javaClass.simpleName}:${e.message?.take(100)}"
+            Logger.error("[EXEC] Exception: $err")
+            StepResult(false, null, err, true)
         }
-
-        // All commands executed — no LOG yet, report back to AI
-        Logger.action("[EXEC] Batch complete — ${commands.size} steps done, awaiting next instruction")
-        return MissionResult(false, null, compileMissionReport())
     }
 
     // ══════════════════════════════════════════════════
-    //  DISPATCHER
+    //  BACKWARD COMPAT: Legacy array execution (v4)
+    // ══════════════════════════════════════════════════
+
+    data class MissionResult(
+        val isLogAction: Boolean,
+        val displayText: String?,
+        val report: String
+    )
+
+    private val missionLog = mutableListOf<String>()
+
+    suspend fun executeAndReport(aiResponse: String): MissionResult {
+        missionLog.clear()
+        val commands = CommandParser.parseMulti(aiResponse)
+        if (commands.isEmpty()) {
+            missionLog.add("PARSE_ERROR: ${aiResponse.take(100)}")
+            return MissionResult(false, null, missionLog.joinToString("\n"))
+        }
+        for ((index, cmd) in commands.withIndex()) {
+            if (cmd.action == LeoProtocol.Action.MISSION_COMPLETE ||
+                cmd.action == LeoProtocol.Action.LOG) {
+                val msg = cmd.value.ifBlank { cmd.raw.optString("message", "Done.") }
+                return MissionResult(true, msg, missionLog.joinToString("\n"))
+            }
+            val sr = executeSingle(cmd)
+            missionLog.add("[${index+1}] ${cmd.action}:${cmd.subAction} → ${sr.result}")
+            if (sr.isMissionComplete) {
+                return MissionResult(true, sr.completionMessage, missionLog.joinToString("\n"))
+            }
+        }
+        return MissionResult(false, null, missionLog.joinToString("\n"))
+    }
+
+    // ══════════════════════════════════════════════════
+    //  DISPATCHER — routes to correct engine
     // ══════════════════════════════════════════════════
 
     private suspend fun dispatchSingle(cmd: CommandParser.LeoCommand): String {
-        if (cmd.delayMs > 0) {
-            Logger.action("⏱ Pre-delay: ${cmd.delayMs}ms")
-            Thread.sleep(cmd.delayMs)
-        }
-
         return when (cmd.action) {
 
-            // ── UI_CONTROL (central — handles all sub_actions) ──────────
-            LeoProtocol.Action.UI_CONTROL -> dispatchUIControl(cmd)
+            // ── AccessibilityService UI Engine ───────────────
+            LeoProtocol.Action.UI_CONTROL   -> dispatchUIControl(cmd)
 
-            // ── READ_SCREEN — Leo's eyes ─────────────────────────────────
-            LeoProtocol.Action.READ_SCREEN -> {
+            // ── Leo's Eyes ───────────────────────────────────
+            LeoProtocol.Action.READ_SCREEN  -> {
                 val svc = LeoAccessibilityService.instance
-                    ?: return "accessibility_service_not_connected:enable_in_settings"
+                    ?: return "accessibility_not_connected:enable_in_settings"
                 svc.readScreenText()
             }
 
-            // ── Standalone WAIT_FOR (root-level alias) ───────────────────
             LeoProtocol.Action.WAIT_FOR -> {
                 val svc = LeoAccessibilityService.instance
-                    ?: return "accessibility_service_not_connected"
+                    ?: return "accessibility_not_connected"
                 svc.waitForNode(cmd.target, cmd.timeoutMs)
             }
 
-            // ── Legacy aliases (backward compat) ─────────────────────────
+            // ── Inbuilt Browser Engine ────────────────────────
+            LeoProtocol.Action.BROWSER_NAVIGATE -> {
+                Logger.action("[BROWSER] Navigate: ${cmd.target}")
+                browserEngine.navigate(cmd.target.ifEmpty { cmd.value })
+            }
+
+            LeoProtocol.Action.BROWSER_CLICK -> {
+                Logger.action("[BROWSER] Click: ${cmd.target}")
+                browserEngine.click(cmd.target)
+            }
+
+            LeoProtocol.Action.BROWSER_TYPE -> {
+                Logger.action("[BROWSER] Type into: ${cmd.target}")
+                browserEngine.type(cmd.target, cmd.value)
+            }
+
+            LeoProtocol.Action.BROWSER_READ -> {
+                Logger.action("[BROWSER] Reading page content")
+                val content = browserEngine.readContent()
+                Logger.action("[BROWSER] Content: ${content.take(80)}...")
+                content
+            }
+
+            LeoProtocol.Action.BROWSER_JS -> {
+                Logger.action("[BROWSER] JS: ${cmd.value.take(80)}")
+                browserEngine.execJS(cmd.value)
+            }
+
+            // ── Terminal / Shell Engine ───────────────────────
+            LeoProtocol.Action.TERMINAL_EXEC,
+            LeoProtocol.Action.SHELL_EXEC -> {
+                val command = cmd.value.ifBlank { cmd.target }
+                Logger.action("[TERMINAL] Exec: ${command.take(80)}")
+                val output = shellBridge.exec(command)
+                Logger.action("[TERMINAL] Output: ${output.take(200)}")
+                output.take(2000)
+            }
+
+            // ── File System ───────────────────────────────────
+            LeoProtocol.Action.FS_READ,
+            LeoProtocol.Action.FS_WRITE,
+            LeoProtocol.Action.FS_DELETE,
+            LeoProtocol.Action.FS_MKDIR  -> dispatchFileAction(cmd)
+
+            // ── Git ───────────────────────────────────────────
+            LeoProtocol.Action.GIT_INIT,
+            LeoProtocol.Action.GIT_PUSH,
+            LeoProtocol.Action.GIT_CLONE -> dispatchGitAction(cmd)
+
+            // ── Hardware ──────────────────────────────────────
+            LeoProtocol.Action.HARDWARE_CONTROL -> dispatchHardwareAction(cmd)
+
+            // ── Static Wait ───────────────────────────────────
+            LeoProtocol.Action.WAIT -> {
+                val ms = cmd.value.toLongOrNull() ?: 500L
+                Thread.sleep(ms.coerceAtMost(10000L))
+                "waited:${ms}ms"
+            }
+
+            // ── Legacy UI aliases ─────────────────────────────
             LeoProtocol.Action.UI_CLICK -> {
                 val svc = LeoAccessibilityService.instance ?: return "accessibility_not_connected"
-                val ok = svc.findNodeAndClick(
-                    textContent = cmd.value.takeIf { it.isNotEmpty() },
-                    viewId      = cmd.target.takeIf { it.isNotEmpty() }
-                )
-                if (ok) "clicked:${cmd.target}" else "click_failed"
+                val ok = svc.findNodeAndClick(textContent = cmd.value.takeIf { it.isNotEmpty() }, viewId = cmd.target.takeIf { it.isNotEmpty() })
+                if (ok) "clicked:${cmd.target}" else "click_failed:${cmd.target}"
             }
             LeoProtocol.Action.UI_TYPE -> {
                 val svc = LeoAccessibilityService.instance ?: return "accessibility_not_connected"
                 val ok = svc.injectTextToNode(viewId = cmd.target.takeIf { it.isNotEmpty() }, textToType = cmd.value)
-                if (ok) "typed:${cmd.target}" else "type_failed"
+                if (ok) "typed:${cmd.target}" else "type_failed:${cmd.target}"
             }
             LeoProtocol.Action.UI_SCROLL -> {
                 val svc = LeoAccessibilityService.instance ?: return "accessibility_not_connected"
@@ -145,45 +221,15 @@ class ActionExecutor(private val context: Context) {
                 if (ok) "scrolled:${cmd.value}" else "scroll_failed"
             }
 
-            // ── File System ──────────────────────────────────────────────
-            LeoProtocol.Action.FS_READ,
-            LeoProtocol.Action.FS_WRITE,
-            LeoProtocol.Action.FS_DELETE,
-            LeoProtocol.Action.FS_MKDIR  -> dispatchFileAction(cmd)
-
-            // ── Git ──────────────────────────────────────────────────────
-            LeoProtocol.Action.GIT_INIT,
-            LeoProtocol.Action.GIT_PUSH,
-            LeoProtocol.Action.GIT_CLONE -> dispatchGitAction(cmd)
-
-            // ── Hardware ─────────────────────────────────────────────────
-            LeoProtocol.Action.HARDWARE_CONTROL -> dispatchHardwareAction(cmd)
-
-            // ── Shell (curl / pm / am only) ──────────────────────────────
-            LeoProtocol.Action.SHELL_EXEC -> {
-                Logger.action("Shell: ${cmd.value.take(80)}")
-                val output = shellBridge.exec(cmd.value)
-                Logger.action("Shell output: ${output.take(200)}")
-                output.take(1000)
-            }
-
-            // ── Static wait (last resort) ────────────────────────────────
-            LeoProtocol.Action.WAIT -> {
-                val ms = cmd.value.toLongOrNull() ?: 500L
-                Logger.action("⏱ Static wait: ${ms}ms")
-                Thread.sleep(ms)
-                "waited:${ms}ms"
-            }
-
             else -> {
-                Logger.warn("Unknown action: ${cmd.action}")
+                Logger.warn("[EXEC] Unknown action: ${cmd.action}")
                 "unknown_action:${cmd.action}"
             }
         }
     }
 
     // ══════════════════════════════════════════════════
-    //  UI_CONTROL — ALL SUB_ACTIONS
+    //  UI_CONTROL — All sub_actions
     // ══════════════════════════════════════════════════
 
     private fun dispatchUIControl(cmd: CommandParser.LeoCommand): String {
@@ -194,7 +240,7 @@ class ActionExecutor(private val context: Context) {
 
             LeoProtocol.SubAction.OPEN_APP -> {
                 val pkg = cmd.target.trim()
-                if (pkg.isEmpty()) return "error:OPEN_APP requires target package name"
+                if (pkg.isEmpty()) return "error:OPEN_APP needs target package"
                 val ok = svc.launchAppByPackage(pkg)
                 if (ok) "app_opened:$pkg" else "launch_failed:$pkg:not_installed"
             }
@@ -202,7 +248,7 @@ class ActionExecutor(private val context: Context) {
             LeoProtocol.SubAction.CLICK -> {
                 val ok = svc.findNodeAndClick(
                     textContent = cmd.target.takeIf { it.isNotEmpty() },
-                    viewId      = cmd.value.takeIf { it.isNotEmpty() }
+                    viewId      = cmd.value.takeIf  { it.isNotEmpty() }
                 )
                 if (ok) "clicked:'${cmd.target}'" else "click_failed:'${cmd.target}':not_found"
             }
@@ -210,20 +256,19 @@ class ActionExecutor(private val context: Context) {
             LeoProtocol.SubAction.LONG_PRESS -> {
                 val ok = svc.findNodeAndLongPress(
                     textContent = cmd.target.takeIf { it.isNotEmpty() },
-                    viewId      = cmd.value.takeIf { it.isNotEmpty() }
+                    viewId      = cmd.value.takeIf  { it.isNotEmpty() }
                 )
                 if (ok) "long_pressed:'${cmd.target}'" else "long_press_failed"
             }
 
             LeoProtocol.SubAction.TYPE -> {
-                val textToType = cmd.value.ifEmpty { cmd.raw.optString("value", "") }
-                val ok = svc.injectTextToNode(
+                val text = cmd.value.ifEmpty { cmd.raw.optString("value", "") }
+                val ok   = svc.injectTextToNode(
                     viewId      = cmd.target.takeIf { it.isNotEmpty() },
                     textContent = cmd.target.takeIf { it.isNotEmpty() },
-                    textToType  = textToType
+                    textToType  = text
                 )
-                if (ok) "typed:'${textToType.take(30)}' into '${cmd.target}'"
-                else    "type_failed:'${cmd.target}'"
+                if (ok) "typed:'${text.take(30)}' into '${cmd.target}'" else "type_failed:'${cmd.target}'"
             }
 
             LeoProtocol.SubAction.SCROLL -> {
@@ -237,35 +282,25 @@ class ActionExecutor(private val context: Context) {
             }
 
             LeoProtocol.SubAction.BACK -> {
-                val ok = svc.pressBack()
-                if (ok) "back_pressed" else "back_failed"
+                if (svc.pressBack()) "back_pressed" else "back_failed"
             }
 
             LeoProtocol.SubAction.HOME -> {
-                val ok = svc.pressHome()
-                if (ok) "home_pressed" else "home_failed"
+                if (svc.pressHome()) "home_pressed" else "home_failed"
             }
 
-            // No sub_action — infer from value ("open", "tap", "click", package name)
             "" -> {
-                val valueLower = cmd.value.lowercase().trim()
+                val v = cmd.value.lowercase().trim()
                 when {
-                    valueLower == "open" && cmd.target.contains(".") -> {
-                        val ok = svc.launchAppByPackage(cmd.target)
-                        if (ok) "app_opened:${cmd.target}" else "launch_failed:${cmd.target}"
+                    v == "open" && cmd.target.contains(".") -> {
+                        if (svc.launchAppByPackage(cmd.target)) "app_opened:${cmd.target}" else "launch_failed:${cmd.target}"
                     }
-                    valueLower == "tap" || valueLower == "click" -> {
-                        val ok = svc.findNodeAndClick(textContent = cmd.target.takeIf { it.isNotEmpty() })
-                        if (ok) "clicked:'${cmd.target}'" else "click_failed:'${cmd.target}'"
+                    v == "tap" || v == "click" -> {
+                        if (svc.findNodeAndClick(textContent = cmd.target.takeIf { it.isNotEmpty() })) "clicked:'${cmd.target}'" else "click_failed:'${cmd.target}'"
                     }
-                    valueLower == "back" -> {
-                        svc.pressBack(); "back_pressed"
-                    }
-                    valueLower == "home" -> {
-                        svc.pressHome(); "home_pressed"
-                    }
+                    v == "back" -> { svc.pressBack(); "back_pressed" }
+                    v == "home" -> { svc.pressHome(); "home_pressed" }
                     else -> {
-                        // Generic click by target text
                         val ok = svc.findNodeAndClick(
                             textContent = cmd.target.takeIf { it.isNotEmpty() },
                             viewId      = cmd.target.takeIf { it.isNotEmpty() }
@@ -280,24 +315,24 @@ class ActionExecutor(private val context: Context) {
     }
 
     // ══════════════════════════════════════════════════
-    //  FILE / GIT / HARDWARE
+    //  File / Git / Hardware
     // ══════════════════════════════════════════════════
 
     private fun dispatchFileAction(cmd: CommandParser.LeoCommand): String {
         return when (cmd.action) {
-            LeoProtocol.Action.FS_WRITE  -> { fileEngine.writeCodeFile(cmd.target, cmd.value); Logger.file("Written: ${cmd.target}"); "written:${cmd.target}" }
-            LeoProtocol.Action.FS_READ   -> { val c = fileEngine.readFileContent(cmd.target); Logger.file("Read: ${cmd.target} (${c.length} bytes)"); c.take(2000) }
-            LeoProtocol.Action.FS_DELETE -> { fileEngine.deleteTarget(cmd.target, cmd.value); Logger.file("Deleted: ${cmd.target}"); "deleted:${cmd.target}" }
-            LeoProtocol.Action.FS_MKDIR  -> { fileEngine.createDirectory(cmd.target); Logger.file("Dir: ${cmd.target}"); "mkdir:${cmd.target}" }
+            LeoProtocol.Action.FS_WRITE  -> { fileEngine.writeCodeFile(cmd.target, cmd.value); "written:${cmd.target}" }
+            LeoProtocol.Action.FS_READ   -> { val c = fileEngine.readFileContent(cmd.target); c.take(3000) }
+            LeoProtocol.Action.FS_DELETE -> { fileEngine.deleteTarget(cmd.target, cmd.value); "deleted:${cmd.target}" }
+            LeoProtocol.Action.FS_MKDIR  -> { fileEngine.createDirectory(cmd.target); "mkdir:${cmd.target}" }
             else -> "unknown_fs"
         }
     }
 
     private fun dispatchGitAction(cmd: CommandParser.LeoCommand): String {
         return when (cmd.action) {
-            LeoProtocol.Action.GIT_INIT  -> { Logger.git("Init: ${cmd.target}"); gitManager.initAndLink(cmd.target, cmd.value) }
-            LeoProtocol.Action.GIT_PUSH  -> { Logger.git("Push: ${cmd.target}"); gitManager.pushAll(cmd.target, cmd.value) }
-            LeoProtocol.Action.GIT_CLONE -> { Logger.git("Clone: ${cmd.target}"); gitManager.cloneRepo(cmd.target, cmd.value) }
+            LeoProtocol.Action.GIT_INIT  -> gitManager.initAndLink(cmd.target, cmd.value)
+            LeoProtocol.Action.GIT_PUSH  -> gitManager.pushAll(cmd.target, cmd.value)
+            LeoProtocol.Action.GIT_CLONE -> gitManager.cloneRepo(cmd.target, cmd.value)
             else -> "unknown_git"
         }
     }
@@ -311,22 +346,7 @@ class ActionExecutor(private val context: Context) {
             HardwareManager.TARGET_BRIGHTNESS -> hardwareManager.setBrightness(cmd.value)
             HardwareManager.TARGET_WIFI       -> hardwareManager.setWifi(cmd.value)
             HardwareManager.TARGET_CAMERA     -> hardwareManager.openCamera()
-            else -> { Logger.warn("Unknown hardware target: ${cmd.target}"); "unknown_hardware:${cmd.target}" }
+            else -> "unknown_hardware:${cmd.target}"
         }
-    }
-
-    // ══════════════════════════════════════════════════
-    //  MISSION REPORT
-    // ══════════════════════════════════════════════════
-
-    private fun formatStep(step: Int, cmd: CommandParser.LeoCommand, result: String): String {
-        val label   = if (cmd.subAction.isNotEmpty()) "${cmd.action}:${cmd.subAction}" else cmd.action
-        val success = !result.startsWith("error:") && !result.startsWith("timeout:")
-        val icon    = if (success) "✓" else "✗"
-        return "$icon [Step $step] $label('${cmd.target.take(35)}') → $result"
-    }
-
-    private fun compileMissionReport(): String {
-        return if (missionLog.isEmpty()) "no_steps_executed" else missionLog.joinToString("\n")
     }
 }
