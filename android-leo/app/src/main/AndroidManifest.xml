@@ -4,8 +4,8 @@
     package="com.shslab.leo">
 
     <!-- ═══════════════════════════════════════════════
-         LEO — ABSOLUTE SOVEREIGNTY PERMISSIONS
-         SHS LAB v4 — OMNIPOTENT SURROGATE
+         LEO — APEX ARCHITECTURE v5 PERMISSIONS
+         SHS LAB — OMNIPOTENT SURROGATE
          ═══════════════════════════════════════════════ -->
 
     <!-- Core system access -->
@@ -16,6 +16,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Voice (STT + TTS + Default Assistant) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.BIND_VOICE_INTERACTION"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- File system -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
@@ -44,6 +49,9 @@
     <uses-permission android:name="android.permission.BATTERY_STATS"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- WebView / Browser (inbuilt Chromium) -->
+    <uses-permission android:name="android.permission.ACCESS_DOWNLOAD_MANAGER" />
+
     <application
         android:name=".LeoApplication"
         android:allowBackup="true"
@@ -53,18 +61,30 @@
         android:theme="@style/Theme.Leo"
         android:requestLegacyExternalStorage="true"
         android:hardwareAccelerated="true"
-        android:largeHeap="false"
+        android:largeHeap="true"
+        android:usesCleartextTraffic="true"
         tools:targetApi="29">
 
-        <!-- ── MAIN ACTIVITY ── -->
+        <!-- ── MAIN ACTIVITY (+ Default Android Assistant) ── -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize">
+            <!-- Standard app launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Register as Android Default Assistant (long-press Home / "Hey Assistant") -->
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- Voice search assistant -->
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
@@ -75,6 +95,13 @@
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
             android:label="Leo Vault — SHS LAB" />
+
+        <!-- ── SURVEILLANCE ACTIVITY ── -->
+        <activity
+            android:name=".SurveillanceActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:label="Leo Surveillance" />
 
         <!-- ── DYNAMIC ISLAND OVERLAY SERVICE ── -->
         <service
@@ -95,6 +122,20 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- ── VOICE INTERACTION SERVICE (Leo as Default Assistant) ── -->
+        <service
+            android:name=".voice.LeoVoiceService"
+            android:exported="true"
+            android:label="Leo Assistant"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/voice_interaction_service" />
         </service>
 
         <!-- ── BOOT RECEIVER ── -->
