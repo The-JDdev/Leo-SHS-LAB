@@ -29,10 +29,10 @@ class LeoNetworkClient {
         // Shared client — single instance, connection pool saves memory
         private val httpClient: OkHttpClient by lazy {
             OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .writeTimeout(15, TimeUnit.SECONDS)
-                .connectionPool(okhttp3.ConnectionPool(2, 30, TimeUnit.SECONDS))
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(90, TimeUnit.SECONDS)   // long for complex AI reasoning
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .connectionPool(okhttp3.ConnectionPool(3, 60, TimeUnit.SECONDS))
                 .retryOnConnectionFailure(true)
                 .build()
         }
@@ -137,7 +137,7 @@ class LeoNetworkClient {
                 }
                 JSONObject().apply {
                     put("model", model)
-                    put("max_tokens", 1024)
+                    put("max_tokens", 2048)
                     put("system", systemMsg)
                     put("messages", msgsArray)
                 }.toString()
@@ -154,8 +154,8 @@ class LeoNetworkClient {
                 JSONObject().apply {
                     put("model", model)
                     put("messages", msgsArray)
-                    put("max_tokens", 1024)
-                    put("temperature", 0.2)  // Low temp for deterministic JSON output
+                    put("max_tokens", 2048)
+                    put("temperature", 0.1)  // Very low for deterministic JSON output
                 }.toString()
             }
         }
