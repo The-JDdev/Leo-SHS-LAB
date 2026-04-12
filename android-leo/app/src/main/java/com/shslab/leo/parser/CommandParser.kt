@@ -155,6 +155,50 @@ object CommandParser {
     }
 
     /**
+     * REACT MODE: Parse exactly ONE command from an AI response.
+     * The AI should output a single JSON object in ReAct mode.
+     * Falls back gracefully if the model still sends an array.
+     */
+    fun parseSingle(aiResponse: String): LeoCommand {
+        val trimmed = aiResponse.trim()
+        Logger.net("[Parser]: parseSingle — ${trimmed.take(80)}")
+
+        val jsonStr = extractAnyJson(trimmed)
+        if (jsonStr == null) {
+            Logger.warn("[Parser]: No JSON found in single response — returning LOG fallback")
+            return LeoCommand(
+                action    = "MISSION_COMPLETE",
+                subAction = "",
+                target    = "",
+                value     = trimmed.take(500),
+                timeoutMs = 0L,
+                raw       = JSONObject().put("action", "MISSION_COMPLETE").put("message", trimmed.take(500))
+            )
+        }
+
+        return when {
+            jsonStr.startsWith("[") -> {
+                // Model sent an array despite instructions — take the first command
+                val cmds = parseJsonArray(jsonStr)
+                cmds.firstOrNull() ?: unknownCommand(trimmed)
+            }
+            jsonStr.startsWith("{") -> {
+                parseObject(JSONObject(jsonStr)) ?: unknownCommand(trimmed)
+            }
+            else -> unknownCommand(trimmed)
+        }
+    }
+
+    private fun unknownCommand(raw: String) = LeoCommand(
+        action    = "LOG",
+        subAction = "",
+        target    = "chat",
+        value     = raw.take(300),
+        timeoutMs = 0L,
+        raw       = JSONObject().put("action", "LOG").put("value", raw.take(300))
+    )
+
+    /**
      * Backward-compatible single-object parse.
      */
     fun parse(aiResponse: String): LeoCommand? = parseMulti(aiResponse).firstOrNull()
