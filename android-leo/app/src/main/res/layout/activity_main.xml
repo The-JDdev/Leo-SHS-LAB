@@ -13,14 +13,14 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingHorizontal="16dp"
-        android:paddingTop="16dp"
-        android:paddingBottom="12dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="10dp"
         android:background="#0A0A0A">
 
         <ImageView
             android:id="@+id/imgLeoLogo"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:src="@mipmap/ic_launcher"
             android:contentDescription="Leo"
             android:scaleType="fitCenter" />
@@ -32,12 +32,14 @@
             android:orientation="vertical"
             android:paddingStart="12dp">
 
+            <!-- Dynamic agent name (set from SecurityManager) -->
             <TextView
+                android:id="@+id/tvAgentName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="LEO"
                 android:textColor="#00E5FF"
-                android:textSize="22sp"
+                android:textSize="20sp"
                 android:letterSpacing="0.2"
                 android:fontFamily="monospace"
                 android:textStyle="bold" />
@@ -45,38 +47,51 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="SHS LAB — Limitless Android Surrogate"
+                android:text="SHS LAB — ReAct APEX Engine"
                 android:textColor="#E91E8C"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:fontFamily="monospace"
                 android:letterSpacing="0.1" />
 
         </LinearLayout>
 
+        <!-- Surveillance button -->
+        <Button
+            android:id="@+id/btnSurveillance"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:text="WATCH"
+            android:textSize="8sp"
+            android:fontFamily="monospace"
+            android:textColor="#000000"
+            android:backgroundTint="#00E5FF"
+            android:paddingHorizontal="8dp"
+            android:layout_marginEnd="5dp" />
+
         <!-- Vault button -->
         <Button
             android:id="@+id/btnVault"
             android:layout_width="wrap_content"
-            android:layout_height="32dp"
+            android:layout_height="30dp"
             android:text="⚙ VAULT"
-            android:textSize="9sp"
+            android:textSize="8sp"
             android:fontFamily="monospace"
             android:textColor="#000000"
             android:backgroundTint="#6B35A5"
-            android:paddingHorizontal="10dp"
-            android:layout_marginEnd="6dp" />
+            android:paddingHorizontal="8dp"
+            android:layout_marginEnd="5dp" />
 
         <!-- Island button -->
         <Button
             android:id="@+id/btnIsland"
             android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:text="ISLAND"
-            android:textSize="9sp"
+            android:layout_height="30dp"
+            android:text="HUD"
+            android:textSize="8sp"
             android:fontFamily="monospace"
             android:textColor="#000000"
             android:backgroundTint="#FFD600"
-            android:paddingHorizontal="10dp" />
+            android:paddingHorizontal="8dp" />
 
     </LinearLayout>
 
@@ -87,14 +102,14 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="#0D0D0D"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="6dp"
         android:gravity="center_vertical">
 
         <View
             android:id="@+id/dotAccessibility"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
             android:background="@drawable/status_dot" />
 
         <TextView
@@ -102,27 +117,27 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Accessibility"
-            android:textColor="#888888"
-            android:textSize="10sp"
+            android:textColor="#666666"
+            android:textSize="9sp"
             android:fontFamily="monospace"
-            android:paddingStart="8dp" />
+            android:paddingStart="6dp" />
 
         <Button
             android:id="@+id/btnEnableAccessibility"
             android:layout_width="wrap_content"
-            android:layout_height="24dp"
+            android:layout_height="22dp"
             android:text="ENABLE"
-            android:textSize="8sp"
+            android:textSize="7sp"
             android:fontFamily="monospace"
             android:textColor="#000000"
             android:backgroundTint="#FF4444"
             android:paddingHorizontal="8dp"
-            android:layout_marginEnd="12dp" />
+            android:layout_marginEnd="10dp" />
 
         <View
             android:id="@+id/dotOverlay"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
             android:background="@drawable/status_dot" />
 
         <TextView
@@ -130,17 +145,17 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Overlay"
-            android:textColor="#888888"
-            android:textSize="10sp"
+            android:textColor="#666666"
+            android:textSize="9sp"
             android:fontFamily="monospace"
-            android:paddingStart="8dp" />
+            android:paddingStart="6dp" />
 
         <Button
             android:id="@+id/btnEnableOverlay"
             android:layout_width="wrap_content"
-            android:layout_height="24dp"
+            android:layout_height="22dp"
             android:text="ENABLE"
-            android:textSize="8sp"
+            android:textSize="7sp"
             android:fontFamily="monospace"
             android:textColor="#000000"
             android:backgroundTint="#FF4444"
@@ -182,14 +197,17 @@
         android:paddingVertical="8dp"
         android:gravity="center_vertical">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="❯"
-            android:textColor="#E91E8C"
-            android:textSize="16sp"
-            android:fontFamily="monospace"
-            android:paddingEnd="6dp" />
+        <!-- MIC button for voice input -->
+        <ImageButton
+            android:id="@+id/btnMic"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_btn_speak_now"
+            android:background="#111111"
+            android:scaleType="centerInside"
+            android:padding="8dp"
+            android:contentDescription="Voice input"
+            android:layout_marginEnd="6dp" />
 
         <EditText
             android:id="@+id/etInput"
@@ -199,7 +217,7 @@
             android:background="@drawable/input_background"
             android:textColor="#00E5FF"
             android:textColorHint="#334455"
-            android:hint="message Leo..."
+            android:hint="give Leo a mission..."
             android:textSize="12sp"
             android:fontFamily="monospace"
             android:paddingHorizontal="10dp"
@@ -212,13 +230,14 @@
             android:id="@+id/btnSend"
             android:layout_width="wrap_content"
             android:layout_height="40dp"
-            android:text="SEND"
+            android:text="GO"
             android:textSize="11sp"
             android:fontFamily="monospace"
             android:textColor="#000000"
             android:backgroundTint="#E91E8C"
-            android:paddingHorizontal="14dp"
-            android:layout_marginStart="8dp" />
+            android:paddingHorizontal="16dp"
+            android:layout_marginStart="8dp"
+            android:textStyle="bold" />
 
     </LinearLayout>
 
