@@ -43,10 +43,43 @@ class LeoNetworkClient {
     private val MAX_HISTORY = 10
 
     /**
-     * Send a prompt to the active AI provider.
-     * Automatically prepends the Leo Protocol identity.
-     * @return Raw AI response string
-     * @throws Exception on network or parse failure
+     * REACT MODE: Send full conversation history to the AI.
+     * The caller builds and manages conversation history — including
+     * the system prompt (already in history[0]).
+     *
+     * This is the primary send method for the ReAct loop.
+     */
+    fun sendWithHistory(history: List<Map<String, String>>): String {
+        val apiKey   = SecurityManager.getActiveApiKey()
+        val endpoint = SecurityManager.getActiveEndpoint()
+        val model    = SecurityManager.getActiveModel()
+        val provider = SecurityManager.getActiveProvider()
+
+        if (apiKey.isBlank()) throw IllegalStateException("API key not configured for provider: $provider")
+
+        Logger.net("[Leo→AI] Uplink: $provider | model: $model | turns: ${history.size}")
+
+        val body    = buildRequestBody(model, history, provider)
+        val request = buildRequest(endpoint, apiKey, body, provider)
+
+        Logger.net("[Leo→AI] Transmitting ${body.contentLength()} bytes...")
+
+        val responseJson = httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                val errBody = response.body?.string() ?: ""
+                throw RuntimeException("HTTP ${response.code}: ${errBody.take(500)}")
+            }
+            response.body?.string() ?: throw RuntimeException("Empty response body")
+        }
+
+        val content = extractContent(responseJson, provider)
+        Logger.net("[Leo←AI] Response: ${content.take(120)}")
+        return content
+    }
+
+    /**
+     * LEGACY: Send a single prompt (builds payload internally).
+     * Still used for boot greeting and simple non-ReAct calls.
      */
     fun sendPrompt(userMessage: String): String {
         val apiKey   = SecurityManager.getActiveApiKey()
@@ -61,7 +94,7 @@ class LeoNetworkClient {
 
         Logger.net("[Leo]: Establishing direct uplink → $provider")
 
-        val messages = LeoProtocol.buildPayload(userMessage, conversationHistory.toList())
+        val messages = LeoProtocol.buildReActPayload(conversationHistory.toList() + listOf(mapOf("role" to "user", "content" to userMessage)))
         val body     = buildRequestBody(model, messages, provider)
         val request  = buildRequest(endpoint, apiKey, body, provider)
 
