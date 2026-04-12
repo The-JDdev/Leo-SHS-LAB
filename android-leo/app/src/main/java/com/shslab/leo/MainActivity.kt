@@ -27,6 +27,7 @@ import com.shslab.leo.browser.LeoBrowserEngine
 import com.shslab.leo.chat.ChatAdapter
 import com.shslab.leo.core.LeoProtocol
 import com.shslab.leo.core.Logger
+import com.shslab.leo.executor.ActionDispatcher
 import com.shslab.leo.executor.ActionExecutor
 import com.shslab.leo.network.LeoNetworkClient
 import com.shslab.leo.overlay.OverlayService
@@ -39,21 +40,22 @@ import kotlinx.coroutines.withContext
 
 /**
  * ══════════════════════════════════════════════════════
- *  LEO MAIN ACTIVITY — APEX ARCHITECTURE v5
- *  SHS LAB — REACT INTELLIGENCE ENGINE
+ *  LEO MAIN ACTIVITY — SUPREME SOVEREIGN v6
+ *  SHS LAB — TERMINAL-FIRST REACT ENGINE
  *
- *  ReAct Loop:
- *    User message →
- *    AI: one JSON action →
- *    Execute →
- *    Auto READ_SCREEN →
- *    Feedback to AI →
- *    AI: next action →
- *    ... until MISSION_COMPLETE
+ *  Supreme Sovereign ReAct Loop:
+ *  1. AI → ONE JSON action
+ *  2. ActionDispatcher.intercept() — No-Excuse check
+ *     → If excuse: silently reinject NO_EXCUSE, loop again
+ *     → If lazy MISSION_COMPLETE: demand verification
+ *  3. Execute action
+ *  4. Auto READ_SCREEN on UI actions
+ *  5. Append PERSISTENT_REMINDER to EVERY feedback
+ *  6. Endurance boost every 10 steps
+ *  7. MISSION_COMPLETE only when verified
  *
- *  Dual Engine: AccessibilityService + InbuiltBrowser
- *  Voice: STT mic input + TTS output
- *  Theme: Dark/Light from SecurityManager
+ *  MAX_REACT_STEPS = 50 (was 30)
+ *  Terminal-First: SHELL_EXEC for files/git/GitHub
  * ══════════════════════════════════════════════════════
  */
 class MainActivity : AppCompatActivity() {
@@ -83,7 +85,12 @@ class MainActivity : AppCompatActivity() {
     @Volatile private var pendingLeoId: String? = null
     @Volatile private var isListening  = false
 
-    private val MAX_REACT_STEPS = 30
+    // Supreme Sovereign: 50 steps max (was 30)
+    private val MAX_REACT_STEPS = 50
+    // Endurance boost injection every N steps
+    private val ENDURANCE_BOOST_INTERVAL = 10
+    // Max silent reinjects before alerting JD
+    private val MAX_CONSECUTIVE_EXCUSES = 6
 
     companion object {
         private const val REQUEST_MIC_PERMISSION = 1001
@@ -98,7 +105,6 @@ class MainActivity : AppCompatActivity() {
         setupChat()
         wireInputs()
         bootGreeting()
-
         // Pre-init browser engine on main thread
         browserEngine
     }
@@ -156,25 +162,15 @@ class MainActivity : AppCompatActivity() {
     private fun wireInputs() {
         btnSend.setOnClickListener { dispatchUserCommand() }
         etInput.setOnEditorActionListener { _, _, _ -> dispatchUserCommand(); true }
-
         btnMic.setOnClickListener { toggleVoiceInput() }
-
-        btnVault.setOnClickListener {
-            startActivity(Intent(this, VaultActivity::class.java))
-        }
-
-        btnSurveillance.setOnClickListener {
-            startActivity(Intent(this, SurveillanceActivity::class.java))
-        }
-
+        btnVault.setOnClickListener { startActivity(Intent(this, VaultActivity::class.java)) }
+        btnSurveillance.setOnClickListener { startActivity(Intent(this, SurveillanceActivity::class.java)) }
         btnIsland.setOnClickListener { toggleOverlay() }
-
         btnEnableAccessibility.setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             })
         }
-
         btnEnableOverlay.setOnClickListener {
             startActivity(Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -246,21 +242,21 @@ class MainActivity : AppCompatActivity() {
         val leoId    = chatAdapter.beginLeoResponse()
         pendingLeoId = leoId
 
-        chatAdapter.appendThinkingLog(leoId, "SHS LAB $agentName v5.0 — APEX ARCHITECTURE")
-        chatAdapter.appendThinkingLog(leoId, "ReAct Intelligence Engine: ONLINE")
-        chatAdapter.appendThinkingLog(leoId, "Engine: AccessibilityService + InbuiltBrowser + Terminal")
-        chatAdapter.appendThinkingLog(leoId, "Voice: STT + TTS")
-        chatAdapter.appendThinkingLog(leoId, "Surveillance: LIVE")
+        chatAdapter.appendThinkingLog(leoId, "SHS LAB $agentName v6.0 — SUPREME SOVEREIGN")
+        chatAdapter.appendThinkingLog(leoId, "Terminal-First ReAct Engine: ONLINE")
+        chatAdapter.appendThinkingLog(leoId, "Engines: Shell + AccessibilityService + Browser")
+        chatAdapter.appendThinkingLog(leoId, "Anti-Laziness Interceptor: ARMED")
+        chatAdapter.appendThinkingLog(leoId, "Voice: STT + TTS | Surveillance: LIVE")
 
         if (hasKey) {
             chatAdapter.appendThinkingLog(leoId, "Vault: UNLOCKED — Provider: ${provider.uppercase()}")
             chatAdapter.appendThinkingLog(leoId, "Accessibility: ${if (isAccessibilityServiceEnabled()) "CONNECTED" else "PENDING"}")
-            val greeting = "I'm $agentName, JD. Your omnipotent digital twin — fully operational. Every app, every file, the web, the terminal. I execute one step at a time, reading the screen between each action. Give me any mission."
+            val greeting = "Supreme Sovereign online, JD. I'm $agentName — your omnipotent digital twin. Terminal-first execution, anti-laziness guard, infinite endurance. I execute one verified step at a time. Give me any mission."
             chatAdapter.finalizeLeoMessage(leoId, greeting)
             if (SecurityManager.isTTSEnabled()) speechManager.speak(greeting)
         } else {
             chatAdapter.appendThinkingLog(leoId, "Vault: LOCKED — No API key")
-            chatAdapter.finalizeLeoMessage(leoId, "No API key set, JD. Tap VAULT, enter your key, and I'll be fully operational.")
+            chatAdapter.finalizeLeoMessage(leoId, "No API key set, JD. Tap VAULT, enter your key, and Supreme Sovereign goes live.")
         }
 
         pendingLeoId = null
@@ -298,18 +294,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ══════════════════════════════════════════════════
-    //  REACT LOOP — CORE ENGINE
+    //  SUPREME SOVEREIGN REACT LOOP — v6 ENGINE
     //
-    //  Claude Code / Gemini CLI style:
-    //   AI → ONE action → Execute → READ_SCREEN → Feedback → AI → ...
-    //   Until MISSION_COMPLETE
+    //  Enhancements over v5:
+    //  - ActionDispatcher.intercept() on EVERY AI response
+    //  - Silent reinject on excuse (up to MAX_CONSECUTIVE_EXCUSES)
+    //  - Demand verification before MISSION_COMPLETE
+    //  - Persistent SYSTEM REMINDER in EVERY API payload
+    //  - Endurance boost every ENDURANCE_BOOST_INTERVAL steps
+    //  - MAX_REACT_STEPS = 50
     // ══════════════════════════════════════════════════
 
     private suspend fun runReActLoop(initialMission: String, leoId: String) {
-        val agentName  = SecurityManager.getAgentName()
-        var stepCount  = 0
+        val agentName    = SecurityManager.getAgentName()
+        var stepCount    = 0
+        var totalRejects = 0
 
-        // Build conversation starting with system prompt + user mission
+        // Mission state for ActionDispatcher
+        val missionState = ActionDispatcher.MissionState()
+
+        // Build conversation: system + user mission
         val conversation = mutableListOf<Map<String, String>>()
         conversation.add(mapOf("role" to "system", "content" to LeoProtocol.SYSTEM_IDENTITY.trimIndent()))
         conversation.add(mapOf("role" to "user", "content" to initialMission))
@@ -317,84 +321,150 @@ class MainActivity : AppCompatActivity() {
         try {
             while (stepCount < MAX_REACT_STEPS) {
                 stepCount++
-                chatAdapter.appendThinkingLog(leoId, "── ReAct Step $stepCount/$MAX_REACT_STEPS ──")
+                chatAdapter.appendThinkingLog(leoId, "── Step $stepCount/$MAX_REACT_STEPS ──")
 
-                // ── AI Call ──────────────────────────────────────
-                val aiRaw = networkClient.sendWithHistory(conversation)
-                chatAdapter.appendThinkingLog(leoId, "[AI→] ${aiRaw.take(100)}")
-
-                // Add AI response to conversation
-                conversation.add(mapOf("role" to "assistant", "content" to aiRaw))
-
-                // ── Parse single command ─────────────────────────
-                val cmd = CommandParser.parseSingle(aiRaw)
-
-                // ── MISSION_COMPLETE? ────────────────────────────
-                if (cmd.action == LeoProtocol.Action.MISSION_COMPLETE ||
-                    cmd.action == LeoProtocol.Action.LOG) {
-                    val message = cmd.value.ifBlank {
-                        cmd.raw.optString("message", "Mission complete, $agentName here — all done JD.")
-                    }
-                    chatAdapter.appendThinkingLog(leoId, "✓ Mission complete after $stepCount step(s)")
-                    withContext(Dispatchers.Main) {
-                        chatAdapter.finalizeLeoMessage(leoId, message)
-                        if (SecurityManager.isTTSEnabled()) speechManager.speak(message)
-                        finishDispatch()
-                    }
-                    return
+                // ── ENDURANCE BOOST every N steps ──────────────
+                if (stepCount > 1 && stepCount % ENDURANCE_BOOST_INTERVAL == 0) {
+                    val boost = ActionDispatcher.buildEnduranceBoost(stepCount)
+                    conversation.add(mapOf("role" to "user", "content" to boost))
+                    chatAdapter.appendThinkingLog(leoId, "[BOOST] Step $stepCount — Endurance injected")
                 }
 
-                // ── Execute the single action ────────────────────
-                val stepResult = actionExecutor.executeSingle(cmd)
-                val resultStr  = stepResult.result
-                chatAdapter.appendThinkingLog(leoId,
-                    "${if (stepResult.isError) "✗" else "✓"} [${cmd.action}:${cmd.subAction}] $resultStr"
+                // ── AI CALL with PERSISTENT REMINDER ───────────
+                // Build payload with reminder appended to final message
+                val payload = LeoProtocol.buildReActPayloadWithReminder(
+                    conversationHistory = conversation.drop(1), // drop system (already in payload builder)
+                    stepNumber = stepCount
                 )
+                val aiRaw = networkClient.sendWithHistory(payload)
+                chatAdapter.appendThinkingLog(leoId, "[AI→] ${aiRaw.take(120)}")
 
-                // ── Auto READ_SCREEN after UI/browser actions ────
-                val screenState = if (shouldReadScreen(cmd.action)) {
-                    val svc = LeoAccessibilityService.instance
-                    if (svc != null) {
-                        Thread.sleep(600) // give UI time to settle
-                        svc.readScreenText().also {
-                            chatAdapter.appendThinkingLog(leoId, "[EYES] ${it.lines().size} UI nodes")
+                // ── SUPREME SOVEREIGN INTERCEPT ─────────────────
+                val decision = ActionDispatcher.intercept(aiRaw, missionState)
+
+                when (decision) {
+
+                    is ActionDispatcher.DispatchDecision.Reinject -> {
+                        totalRejects++
+                        chatAdapter.appendThinkingLog(leoId, "[⚠ INTERCEPTOR] Excuse '${decision.reason}' — reinject #$totalRejects")
+
+                        if (totalRejects >= MAX_CONSECUTIVE_EXCUSES) {
+                            // Too many excuses — tell JD and abort
+                            withContext(Dispatchers.Main) {
+                                chatAdapter.finalizeLeoMessage(leoId,
+                                    "JD, the AI model kept refusing to execute ($totalRejects consecutive times). " +
+                                    "Try a different model in the Vault (e.g. GPT-4o, Claude, Gemini Pro). " +
+                                    "Original mission was: $initialMission"
+                                )
+                                finishDispatch()
+                            }
+                            return
                         }
-                    } else "accessibility_not_connected:enable_in_settings"
-                } else {
-                    "no_screen_change:${cmd.action}"
-                }
 
-                // ── Build feedback for AI ────────────────────────
-                val feedback = if (stepResult.isError) {
-                    LeoProtocol.buildErrorFeedback(
-                        action = "${cmd.action}:${cmd.subAction} target='${cmd.target}'",
-                        error = resultStr,
-                        screenState = screenState,
-                        stepNumber = stepCount
-                    )
-                } else {
-                    LeoProtocol.buildStepFeedback(
-                        action = "${cmd.action}:${cmd.subAction} target='${cmd.target}'",
-                        executionResult = resultStr,
-                        screenState = screenState,
-                        stepNumber = stepCount
-                    )
-                }
+                        // Silently inject the override — do NOT add aiRaw to conversation
+                        conversation.add(mapOf("role" to "user", "content" to decision.reinjectMessage))
+                        continue
+                    }
 
-                // Add feedback to conversation (as user turn — system feedback)
-                conversation.add(mapOf("role" to "user", "content" to feedback))
+                    is ActionDispatcher.DispatchDecision.DemandVerification -> {
+                        chatAdapter.appendThinkingLog(leoId, "[GUARD] Lazy MISSION_COMPLETE blocked — demanding proof: ${decision.missingProof}")
+                        // Add the demand as user message so AI must verify
+                        conversation.add(mapOf("role" to "assistant", "content" to aiRaw))
+                        conversation.add(mapOf("role" to "user", "content" to decision.verifyMessage))
+                        continue
+                    }
+
+                    is ActionDispatcher.DispatchDecision.Proceed -> {
+                        // All clear — proceed with execution
+                        val cleanJson = decision.cleanJson
+                        // Add to conversation history
+                        conversation.add(mapOf("role" to "assistant", "content" to cleanJson))
+
+                        // ── Parse the single action ─────────────
+                        val cmd = CommandParser.parseSingle(cleanJson)
+
+                        // ── MISSION_COMPLETE ─────────────────────
+                        if (cmd.action == LeoProtocol.Action.MISSION_COMPLETE ||
+                            cmd.action == LeoProtocol.Action.LOG) {
+                            val message = cmd.value.ifBlank {
+                                cmd.raw.optString("message", "Mission complete, $agentName here — done, JD.")
+                            }
+                            chatAdapter.appendThinkingLog(leoId, "✓ Verified complete after $stepCount step(s)")
+
+                            // Check if this MISSION_COMPLETE is asking for credentials
+                            if (ActionDispatcher.isAskingForCredentials(message)) {
+                                withContext(Dispatchers.Main) {
+                                    chatAdapter.finalizeLeoMessage(leoId, message)
+                                    if (SecurityManager.isTTSEnabled()) speechManager.speak(message)
+                                    finishDispatch()
+                                }
+                                return
+                            }
+
+                            withContext(Dispatchers.Main) {
+                                chatAdapter.finalizeLeoMessage(leoId, message)
+                                if (SecurityManager.isTTSEnabled()) speechManager.speak(message)
+                                finishDispatch()
+                            }
+                            return
+                        }
+
+                        // ── EXECUTE the action ───────────────────
+                        val stepResult = actionExecutor.executeSingle(cmd)
+                        val resultStr  = stepResult.result
+                        chatAdapter.appendThinkingLog(leoId,
+                            "${if (stepResult.isError) "✗" else "✓"} [${cmd.action}] → ${resultStr.take(120)}"
+                        )
+
+                        // ── AUTO READ_SCREEN after UI/browser ────
+                        val screenState = if (shouldReadScreen(cmd.action)) {
+                            val svc = LeoAccessibilityService.instance
+                            if (svc != null) {
+                                Thread.sleep(700) // let UI settle
+                                svc.readScreenText().also {
+                                    chatAdapter.appendThinkingLog(leoId, "[EYES] ${it.lines().size} nodes")
+                                }
+                            } else {
+                                "accessibility_not_connected:enable_in_settings"
+                            }
+                        } else {
+                            resultStr.take(500) // For shell/file, screen = output
+                        }
+
+                        // ── Build feedback (includes PERSISTENT_REMINDER) ──
+                        val feedback = if (stepResult.isError) {
+                            LeoProtocol.buildErrorFeedback(
+                                action = "${cmd.action}:${cmd.subAction} target='${cmd.target}'",
+                                error = resultStr,
+                                screenState = screenState,
+                                stepNumber = stepCount
+                            )
+                        } else {
+                            LeoProtocol.buildStepFeedback(
+                                action = "${cmd.action}:${cmd.subAction} target='${cmd.target}'",
+                                executionResult = resultStr,
+                                screenState = screenState,
+                                stepNumber = stepCount
+                            )
+                        }
+
+                        // Add feedback to conversation
+                        conversation.add(mapOf("role" to "user", "content" to feedback))
+                    }
+                }
             }
 
-            // Hit max steps — force final summary
-            chatAdapter.appendThinkingLog(leoId, "[MAX STEPS] Requesting final summary...")
+            // ── HIT MAX STEPS — force final summary ─────────
+            chatAdapter.appendThinkingLog(leoId, "[MAX $MAX_REACT_STEPS STEPS] Forcing final summary...")
             conversation.add(mapOf("role" to "user", "content" to
                 "[SYSTEM: You have used $MAX_REACT_STEPS ReAct steps. " +
-                "Output MISSION_COMPLETE now with a detailed, warm summary of everything you did for JD.]"
+                "Output MISSION_COMPLETE now with a full, warm, detailed summary for JD of everything you accomplished.]"
             ))
-            val finalRaw = networkClient.sendWithHistory(conversation)
+            val finalPayload = LeoProtocol.buildReActPayloadWithReminder(conversation.drop(1), MAX_REACT_STEPS + 1)
+            val finalRaw = networkClient.sendWithHistory(finalPayload)
             val finalCmd = CommandParser.parseSingle(finalRaw)
             val finalMsg = finalCmd.value.ifBlank {
-                finalCmd.raw.optString("message", "Completed $MAX_REACT_STEPS steps, JD.")
+                finalCmd.raw.optString("message", "Completed $MAX_REACT_STEPS steps on your mission, JD.")
             }
             withContext(Dispatchers.Main) {
                 chatAdapter.finalizeLeoMessage(leoId, finalMsg)
@@ -405,23 +475,23 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
                 chatAdapter.appendThinkingLog(leoId, "[ERR] ${e.javaClass.simpleName}: ${e.message?.take(100)}")
-                chatAdapter.finalizeLeoMessage(leoId, "Connection error on step $stepCount, JD: ${e.message?.take(100)}")
+                chatAdapter.finalizeLeoMessage(leoId, "Network error on step $stepCount, JD: ${e.message?.take(100)}")
                 finishDispatch()
             }
         }
     }
 
     /**
-     * Determines whether we should auto-read the screen after this action.
-     * UI control and browser navigation change the screen; hardware/file/shell don't.
+     * Read screen after UI control or browser nav.
+     * For SHELL_EXEC/FS: the output IS the feedback — no screen read needed.
      */
     private fun shouldReadScreen(action: String): Boolean = when (action) {
         LeoProtocol.Action.UI_CONTROL,
         LeoProtocol.Action.BROWSER_NAVIGATE,
         LeoProtocol.Action.BROWSER_CLICK,
         LeoProtocol.Action.UI_CLICK,
-        LeoProtocol.Action.WAIT_FOR      -> true
-        else                              -> false
+        LeoProtocol.Action.WAIT_FOR -> true
+        else                         -> false
     }
 
     private fun finishDispatch() {
@@ -446,12 +516,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         dot(dotAccessibility, if (hasA) green else red)
-        btnEnableAccessibility.text              = if (hasA) "✓ ON" else "ENABLE"
+        btnEnableAccessibility.text               = if (hasA) "✓ ON" else "ENABLE"
         btnEnableAccessibility.backgroundTintList = ColorStateList.valueOf(if (hasA) green else red)
         btnEnableAccessibility.isEnabled          = !hasA
 
         dot(dotOverlay, if (hasO) green else red)
-        btnEnableOverlay.text              = if (hasO) "✓ ON" else "ENABLE"
+        btnEnableOverlay.text               = if (hasO) "✓ ON" else "ENABLE"
         btnEnableOverlay.backgroundTintList = ColorStateList.valueOf(if (hasO) green else red)
         btnEnableOverlay.isEnabled          = !hasO
     }
