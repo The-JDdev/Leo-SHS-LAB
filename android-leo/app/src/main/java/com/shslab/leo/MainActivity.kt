@@ -317,6 +317,8 @@ class MainActivity : AppCompatActivity() {
         val conversation = mutableListOf<Map<String, String>>()
         conversation.add(mapOf("role" to "system", "content" to LeoProtocol.SYSTEM_IDENTITY.trimIndent()))
         conversation.add(mapOf("role" to "user", "content" to initialMission))
+        // ── DORAEMON MEMORY: store mission for future RAG recall ──
+        try { com.shslab.leo.memory.MemoryManager.store("episodic", "JD asked: $initialMission", importance = 6) } catch (_: Throwable) {}
 
         try {
             while (stepCount < MAX_REACT_STEPS) {
@@ -406,6 +408,8 @@ class MainActivity : AppCompatActivity() {
                                 if (SecurityManager.isTTSEnabled()) speechManager.speak(message)
                                 finishDispatch()
                             }
+                            // ── DORAEMON MEMORY: persist the chat turn ──
+                            try { com.shslab.leo.memory.MemoryManager.storeChat(initialMission, message) } catch (_: Throwable) {}
                             return
                         }
 
