@@ -2,6 +2,8 @@ package com.shslab.leo.network
 
 import com.shslab.leo.core.LeoProtocol
 import com.shslab.leo.core.Logger
+import com.shslab.leo.memory.MemoryManager
+import com.shslab.leo.persona.DoraemonPersona
 import com.shslab.leo.security.SecurityManager
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -59,7 +61,10 @@ class LeoNetworkClient {
 
         Logger.net("[Leo→AI] Uplink: $provider | model: $model | turns: ${history.size}")
 
-        val body    = buildRequestBody(model, history, provider)
+        // ═══ DORAEMON PERSONA + RAG INJECTION ═══
+        val transformed = injectDoraemonAndRag(history)
+
+        val body    = buildRequestBody(model, transformed, provider)
         val request = buildRequest(endpoint, apiKey, body, provider)
 
         Logger.net("[Leo→AI] Transmitting ${body.contentLength()} bytes...")
@@ -116,6 +121,42 @@ class LeoNetworkClient {
         appendHistory("assistant", content)
 
         return content
+    }
+
+    /**
+     * v1.7-doraemon: prepends Doraemon persona to the system message and
+     * injects RAG memories into the latest user message before sending.
+     */
+    private fun injectDoraemonAndRag(history: List<Map<String, String>>): List<Map<String, String>> {
+        if (history.isEmpty()) return history
+        val out = ArrayList<Map<String, String>>(history.size)
+
+        // Find the index of the last user message for RAG injection
+        val lastUserIdx = history.indexOfLast { it["role"] == "user" }
+        val lastUserContent = if (lastUserIdx >= 0) history[lastUserIdx]["content"].orEmpty() else ""
+        val rag = if (lastUserContent.isNotBlank()) MemoryManager.buildRagContext(lastUserContent) else ""
+
+        var systemHandled = false
+        history.forEachIndexed { i, msg ->
+            val role = msg["role"].orEmpty()
+            val content = msg["content"].orEmpty()
+            when {
+                role == "system" && !systemHandled -> {
+                    systemHandled = true
+                    val merged = DoraemonPersona.SYSTEM_PROMPT + "\n\n" + content
+                    out += mapOf("role" to "system", "content" to merged)
+                }
+                i == lastUserIdx && rag.isNotBlank() -> {
+                    out += mapOf("role" to "user", "content" to rag + "\n" + content)
+                }
+                else -> out += msg
+            }
+        }
+        // If no system message existed, prepend Doraemon persona as one
+        if (!systemHandled) {
+            out.add(0, mapOf("role" to "system", "content" to DoraemonPersona.SYSTEM_PROMPT))
+        }
+        return out
     }
 
     private fun buildRequestBody(
